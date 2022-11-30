@@ -1,16 +1,20 @@
 extern crate core;
 
 fn parse(input: &str) -> Vec<u32> {
-    return input.split("\n").map(|s| s.parse::<u32>().unwrap()).collect();
+    return input
+        .split("\n")
+        .map(|s| s.parse::<u32>().unwrap())
+        .collect();
 }
 
 fn count_increases(measurements: &[u32]) -> u32 {
-    return measurements.windows(2).map(|pair| {
-        match pair {
-            [a, b] if b>a => 1,
+    return measurements
+        .windows(2)
+        .map(|pair| match pair {
+            [a, b] if b > a => 1,
             _ => 0,
-        }
-    }).sum();
+        })
+        .sum();
 }
 
 fn part1(input: &str) -> u32 {
@@ -18,9 +22,11 @@ fn part1(input: &str) -> u32 {
 }
 
 fn part2(input: &str) -> u32 {
-    let windows: Vec<u32> = parse(input).as_slice().windows(3).map(|items| {
-        items.iter().sum()
-    }).collect();
+    let windows: Vec<u32> = parse(input)
+        .as_slice()
+        .windows(3)
+        .map(|items| items.iter().sum())
+        .collect();
     return count_increases(windows.as_slice());
 }
 
