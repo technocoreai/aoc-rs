@@ -1,5 +1,3 @@
-extern crate core;
-
 fn parse(input: &str) -> Vec<u32> {
     return input
         .split("\n")
