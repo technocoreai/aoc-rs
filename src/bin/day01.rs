@@ -1,3 +1,5 @@
+use scaffolding::aoc_main;
+
 fn parse(input: &str) -> Vec<u32> {
     return input
         .trim()
@@ -17,14 +19,8 @@ fn part2(input: &str) -> u32 {
     return elves.iter().rev().take(3).sum();
 }
 
-static INPUT: &str = include_str!("input/01.txt");
-
 fn main() {
-    for (i, fun) in [part1, part2].iter().enumerate() {
-        let solution = fun(INPUT);
-        let part_num = i + 1;
-        println!("Part {part_num}: {solution}");
-    }
+    aoc_main!(part1, part2);
 }
 
 #[cfg(test)]
