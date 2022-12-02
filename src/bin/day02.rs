@@ -1,6 +1,7 @@
+use crate::Move::{Paper, Rock, Scissors};
 use scaffolding::aoc_main;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 enum Move {
     Rock,
     Paper,
@@ -10,90 +11,104 @@ enum Move {
 impl Move {
     fn choice_points(&self) -> u32 {
         match self {
-            Move::Rock => 1,
-            Move::Paper => 2,
-            Move::Scissors => 3,
+            Rock => 1,
+            Paper => 2,
+            Scissors => 3,
         }
     }
 }
 
-impl std::str::FromStr for Move {
-    type Err = String;
+fn parse_move(s: &str) -> Move {
+    match s {
+        "A" | "X" => Rock,
+        "B" | "Y" => Paper,
+        "C" | "Z" => Scissors,
+        unknown => panic!("Invalid move: {}", unknown),
+    }
+}
 
-    fn from_str(s: &str) -> Result<Self, String> {
-        match s {
-            "A" | "X" => Ok(Move::Rock),
-            "B" | "Y" => Ok(Move::Paper),
-            "C" | "Z" => Ok(Move::Scissors),
-            unknown => Err(format!("Invalid move: {}", unknown)),
+#[derive(Debug, Copy, Clone)]
+enum Outcome {
+    Win,
+    Draw,
+    Lose,
+}
+
+impl Outcome {
+    fn determine_move(&self, opponent: Move) -> Move {
+        match (opponent, self) {
+            (x, Outcome::Draw) => x,
+            (Rock, Outcome::Win) => Paper,
+            (Paper, Outcome::Win) => Scissors,
+            (Scissors, Outcome::Win) => Rock,
+            (Rock, Outcome::Lose) => Scissors,
+            (Paper, Outcome::Lose) => Rock,
+            (Scissors, Outcome::Lose) => Paper,
         }
     }
 }
 
-#[derive(Debug)]
-struct Round {
-    player: Move,
-    opponent: Move,
-}
-
-impl Round {
-    fn score(&self) -> u32 {
-        let round_points = match self {
-            Round { player, opponent } if player == opponent => 3,
-            Round {
-                player: Move::Rock,
-                opponent: Move::Scissors,
-            } => 6,
-            Round {
-                player: Move::Paper,
-                opponent: Move::Rock,
-            } => 6,
-            Round {
-                player: Move::Scissors,
-                opponent: Move::Paper,
-            } => 6,
-            _ => 0,
-        };
-        round_points + self.player.choice_points()
+fn parse_outcome(s: &str) -> Outcome {
+    match s {
+        "X" => Outcome::Lose,
+        "Y" => Outcome::Draw,
+        "Z" => Outcome::Win,
+        unknown => panic!("Invalid outcome: {}", unknown),
     }
 }
 
-impl std::str::FromStr for Round {
-    type Err = String;
+fn round_score(player: Move, opponent: Move) -> u32 {
+    let outcome_points = match (&player, &opponent) {
+        (a, b) if a == b => 3,
+        (Rock, Scissors) => 6,
+        (Paper, Rock) => 6,
+        (Scissors, Paper) => 6,
+        _ => 0,
+    };
+    outcome_points + player.choice_points()
+}
 
-    fn from_str(s: &str) -> Result<Self, String> {
-        match s.split_once(" ") {
-            Some((opponent, player)) => {
-                let parsed_opponent = opponent.parse::<Move>()?;
-                let parsed_player = player.parse::<Move>()?;
-                Ok(Round {
-                    player: parsed_player,
-                    opponent: parsed_opponent,
-                })
-            }
-            None => Err(format!("Invalid round: {}", s)),
+fn score_part1(round: &str) -> u32 {
+    match round.split_once(" ") {
+        Some((opponent, player)) => {
+            let opponent_move = parse_move(opponent);
+            let player_move = parse_move(player);
+            round_score(player_move, opponent_move)
         }
+        None => panic!("Invalid round: {}", round),
     }
-}
-
-fn parse(input: &str) -> Vec<Round> {
-    input
-        .trim()
-        .split("\n")
-        .map(|round| round.parse::<Round>().unwrap())
-        .collect()
 }
 
 fn part1(input: &str) -> u32 {
-    parse(input).iter().map(|round| round.score()).sum()
+    input
+        .trim()
+        .split("\n")
+        .map(|round| score_part1(round))
+        .sum()
+}
+
+fn score_part2(round: &str) -> u32 {
+    match round.split_once(" ") {
+        Some((opponent, expected_outcome)) => {
+            let opponent_move = parse_move(opponent);
+            let outcome = parse_outcome(expected_outcome);
+            let player_move = outcome.determine_move(opponent_move);
+            round_score(player_move, opponent_move)
+        }
+        None => panic!("Invalid round: {}", round),
+    }
 }
 
 fn part2(input: &str) -> u32 {
-    unimplemented!();
+    input
+        .trim()
+        .split("\n")
+        .map(|round| score_part2(round))
+        .sum()
 }
 
 fn main() {
-    aoc_main!(part1);
+    aoc_main!(part1, part2);
 }
 
 #[cfg(test)]
@@ -109,8 +124,8 @@ C Z";
         assert_eq!(part1(EXAMPLE_INPUT), 15);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 12);
+    }
 }
