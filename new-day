@@ -2,8 +2,10 @@
 set -eou pipefail
 set -o noclobber
 
-FILENAME="src/bin/day$(date +'%d').rs"
-cat > "$FILENAME" << EOF
+DAY="$(date +'%d')"
+TASK_FILE="src/bin/day$DAY.rs"
+
+cat > "$TASK_FILE" << EOF
 use scaffolding::aoc_main;
 
 fn part1(input: &str) -> u32 {
@@ -35,5 +37,12 @@ mod tests {
     //}
 }
 EOF
-git add "$FILENAME"
-_idea "$(realpath "$0")" "$FILENAME"
+git add "$TASK_FILE"
+
+if [[ -f ~/Downloads/input.txt ]]; then
+    INPUT_FILE="input/$DAY.txt"
+    mv ~/Downloads/input.txt "$INPUT_FILE"
+    git add "$INPUT_FILE"
+fi
+
+_idea "$(dirname "$(realpath "$0")")" "$TASK_FILE"
