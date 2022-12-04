@@ -29,22 +29,18 @@ fn parse_line(line: &str) -> Option<AssignmentPair> {
     Some((parse_range(first)?, parse_range(second)?))
 }
 
-fn parse(input: &str) -> Vec<AssignmentPair> {
+fn parse(input: &str) -> impl Iterator<Item = AssignmentPair> + '_ {
     input
         .split("\n")
         .map(|line| parse_line(line).unwrap_or_else(|| panic!("Invalid line: {}", line)))
-        .collect()
 }
 
 fn part1(input: &str) -> usize {
-    parse(input)
-        .iter()
-        .filter(|(a, b)| fully_contains(a, b))
-        .count()
+    parse(input).filter(|(a, b)| fully_contains(a, b)).count()
 }
 
 fn part2(input: &str) -> usize {
-    parse(input).iter().filter(|(a, b)| overlaps(a, b)).count()
+    parse(input).filter(|(a, b)| overlaps(a, b)).count()
 }
 
 fn main() {
