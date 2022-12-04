@@ -80,11 +80,7 @@ fn score_part1(round: &str) -> u32 {
 }
 
 fn part1(input: &str) -> u32 {
-    input
-        .trim()
-        .split("\n")
-        .map(|round| score_part1(round))
-        .sum()
+    input.split("\n").map(|round| score_part1(round)).sum()
 }
 
 fn score_part2(round: &str) -> u32 {

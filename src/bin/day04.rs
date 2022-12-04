@@ -16,7 +16,11 @@ fn parse_range(range: &str) -> Option<Assignment> {
 }
 
 fn fully_contains(a: &Assignment, b: &Assignment) -> bool {
-    (a.start <= b.start && a.end >= b.end)
+    (a.start <= b.start && a.end >= b.end) || (b.start <= a.start && b.end >= a.end)
+}
+
+fn overlaps(a: &Assignment, b: &Assignment) -> bool {
+    a.start <= b.end - 1 && b.start <= a.end - 1
 }
 
 fn parse_line(line: &str) -> Option<AssignmentPair> {
@@ -27,7 +31,6 @@ fn parse_line(line: &str) -> Option<AssignmentPair> {
 
 fn parse(input: &str) -> Vec<AssignmentPair> {
     input
-        .trim()
         .split("\n")
         .map(|line| parse_line(line).unwrap_or_else(|| panic!("Invalid line: {}", line)))
         .collect()
@@ -36,16 +39,16 @@ fn parse(input: &str) -> Vec<AssignmentPair> {
 fn part1(input: &str) -> usize {
     parse(input)
         .iter()
-        .filter(|(a, b)| fully_contains(a, b) || fully_contains(b, a))
+        .filter(|(a, b)| fully_contains(a, b))
         .count()
 }
 
-fn part2(input: &str) -> u32 {
-    unimplemented!();
+fn part2(input: &str) -> usize {
+    parse(input).iter().filter(|(a, b)| overlaps(a, b)).count()
 }
 
 fn main() {
-    aoc_main!(part1);
+    aoc_main!(part1, part2);
 }
 
 #[cfg(test)]
@@ -64,8 +67,8 @@ mod tests {
         assert_eq!(part1(EXAMPLE_INPUT), 2);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 4);
+    }
 }

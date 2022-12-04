@@ -4,12 +4,13 @@ macro_rules! aoc_main {
         use std::fs;
 
         let filename = format!("input/{}.txt", module_path!().replace("day", ""));
-        let input = fs::read_to_string(filename).unwrap();
+        let contents = fs::read_to_string(filename).unwrap();
+        let input = contents.as_str().trim();
 
         let parts = [$p1 $(, $p2) ?];
         for (i, part) in parts.iter().enumerate() {
             let id = i + 1;
-            let solution = part(input.as_str());
+            let solution = part(input);
             println!("Part {id}: {solution}");
         }
     };

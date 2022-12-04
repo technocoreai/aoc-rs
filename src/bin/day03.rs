@@ -3,7 +3,6 @@ use std::collections::HashSet;
 
 fn parse(input: &str) -> Vec<Vec<char>> {
     input
-        .trim()
         .split("\n")
         .map(|line| line.chars().collect())
         .collect()

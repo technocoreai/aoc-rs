@@ -2,7 +2,6 @@ use scaffolding::aoc_main;
 
 fn parse(input: &str) -> Vec<u32> {
     return input
-        .trim()
         .split("\n\n")
         .map(|elf| elf.split("\n").map(|s| s.parse::<u32>().unwrap()).sum())
         .collect();
