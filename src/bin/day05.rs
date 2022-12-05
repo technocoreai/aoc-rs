@@ -35,14 +35,13 @@ impl MoveCommand {
 impl From<&str> for MoveCommand {
     fn from(s: &str) -> Self {
         let tokens: Vec<&str> = s.split(" ").collect();
-        let invalid = || -> ! { panic!("Invalid move line: {}", s) };
         match tokens[..] {
             ["move", count, "from", from, "to", to] => MoveCommand {
-                from: from.parse::<usize>().unwrap_or_else(|_| invalid()) - 1,
-                to: to.parse::<usize>().unwrap_or_else(|_| invalid()) - 1,
-                count: count.parse::<usize>().unwrap_or_else(|_| invalid()),
+                from: from.parse::<usize>().unwrap() - 1,
+                to: to.parse::<usize>().unwrap() - 1,
+                count: count.parse::<usize>().unwrap(),
             },
-            _ => invalid(),
+            _ => panic!("Invalid move line: {}", s),
         }
     }
 }
@@ -56,14 +55,13 @@ struct Input {
 }
 
 fn parse_layout_line(line: &str) -> Vec<(usize, char)> {
-    line.match_indices("[")
-        .map(|(pos, _)| {
-            let stack_num = pos / 4;
-            let char = line
-                .chars()
-                .nth(pos + 1)
-                .unwrap_or_else(|| panic!("Layout line too short"));
-            (stack_num, char)
+    let foo: Vec<char> = line.chars().collect();
+    foo.chunks(4)
+        .enumerate()
+        .flat_map(|(idx, chunk)| match chunk {
+            ['[', crate_id, ']', ' '] => Some((idx, crate_id.clone())),
+            ['[', crate_id, ']'] => Some((idx, crate_id.clone())),
+            _ => None,
         })
         .collect()
 }
@@ -112,14 +110,16 @@ fn print_stacks(stacks: &CrateStacks) {
 }
 
 fn solve(input: &str, handler: fn(&MoveCommand, &mut CrateStacks)) -> String {
-    let Input { crates, commands } = Input::from(input);
-    let result = commands.iter().fold(crates, |mut crates, cmd| {
+    let Input {
+        mut crates,
+        commands,
+    } = Input::from(input);
+    for cmd in commands {
         println!("Running {:?}", cmd);
         print_stacks(&crates);
         handler(&cmd, &mut crates);
-        crates
-    });
-    let topmost: Vec<String> = result
+    }
+    let topmost: Vec<String> = crates
         .into_iter()
         .flat_map(|stack| stack.iter().nth(0).map(char::to_string))
         .collect();
