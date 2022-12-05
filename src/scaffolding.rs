@@ -5,7 +5,7 @@ macro_rules! aoc_main {
 
         let filename = format!("input/{}.txt", module_path!().replace("day", ""));
         let contents = fs::read_to_string(filename).unwrap();
-        let input = contents.as_str().trim();
+        let input = contents.as_str().trim_end();
 
         let parts = [$p1 $(, $p2) ?];
         for (i, part) in parts.iter().enumerate() {
