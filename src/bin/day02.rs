@@ -1,5 +1,5 @@
 use crate::Move::{Paper, Rock, Scissors};
-use scaffolding::aoc_main;
+use utils::aoc_main;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 enum Move {

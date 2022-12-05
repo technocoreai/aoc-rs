@@ -1,4 +1,4 @@
-use scaffolding::aoc_main;
+use utils::aoc_main;
 
 fn parse(input: &str) -> Vec<u32> {
     return input

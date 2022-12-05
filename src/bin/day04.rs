@@ -1,5 +1,5 @@
-use scaffolding::aoc_main;
 use std::ops::Range;
+use utils::{aoc_main, parse_obj};
 
 type Assignment = Range<u32>;
 type AssignmentPair = (Assignment, Assignment);
@@ -23,16 +23,14 @@ fn overlaps(a: &Assignment, b: &Assignment) -> bool {
     a.start <= b.end - 1 && b.start <= a.end - 1
 }
 
-fn parse_line(line: &str) -> Option<AssignmentPair> {
-    let parts = line.split_once(",")?;
-    let (first, second) = parts;
-    Some((parse_range(first)?, parse_range(second)?))
-}
-
 fn parse(input: &str) -> impl Iterator<Item = AssignmentPair> + '_ {
-    input
-        .split("\n")
-        .map(|line| parse_line(line).unwrap_or_else(|| panic!("Invalid line: {}", line)))
+    input.split("\n").map(|line| {
+        parse_obj("line", line, || {
+            let parts = line.split_once(",")?;
+            let (first, second) = parts;
+            Some((parse_range(first)?, parse_range(second)?))
+        })
+    })
 }
 
 fn part1(input: &str) -> usize {

@@ -1,5 +1,5 @@
-use scaffolding::aoc_main;
 use std::collections::HashSet;
+use utils::aoc_main;
 
 fn parse(input: &str) -> Vec<Vec<char>> {
     input

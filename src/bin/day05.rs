@@ -1,5 +1,6 @@
-use scaffolding::aoc_main;
 use std::collections::VecDeque;
+use std::fmt::Debug;
+use utils::{aoc_main, parse_obj};
 
 #[derive(Debug, PartialEq)]
 struct MoveCommand {
@@ -35,14 +36,14 @@ impl MoveCommand {
 impl From<&str> for MoveCommand {
     fn from(s: &str) -> Self {
         let tokens: Vec<&str> = s.split(" ").collect();
-        match tokens[..] {
-            ["move", count, "from", from, "to", to] => MoveCommand {
-                from: from.parse::<usize>().unwrap() - 1,
-                to: to.parse::<usize>().unwrap() - 1,
-                count: count.parse::<usize>().unwrap(),
-            },
-            _ => panic!("Invalid move line: {}", s),
-        }
+        parse_obj("move command", s, || match tokens[..] {
+            ["move", count, "from", from, "to", to] => Some(MoveCommand {
+                from: from.parse::<usize>().ok()? - 1,
+                to: to.parse::<usize>().ok()? - 1,
+                count: count.parse::<usize>().ok()?,
+            }),
+            _ => None,
+        })
     }
 }
 

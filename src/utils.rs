@@ -15,3 +15,12 @@ macro_rules! aoc_main {
         }
     };
 }
+
+pub fn parse<T, F: FnOnce() -> Option<T>>(error_msg: &str, parse_fn: F) -> T {
+    parse_fn().unwrap_or_else(|| panic!("{}", error_msg))
+}
+
+pub fn parse_obj<T, F: FnOnce() -> Option<T>>(kind: &str, value: &str, parse_fn: F) -> T {
+    let error_msg = format!("Invalid {}: {}", kind, value);
+    parse(error_msg.as_str(), parse_fn)
+}

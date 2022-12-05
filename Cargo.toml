@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "scaffolding"
-path = "src/scaffolding.rs"
+name = "utils"
+path = "src/utils.rs"
 
 [dependencies]
