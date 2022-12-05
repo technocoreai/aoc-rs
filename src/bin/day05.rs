@@ -156,8 +156,8 @@ move 1 from 1 to 2";
         assert_eq!(
             MoveCommand::from("move 3 from 1 to 2"),
             MoveCommand {
-                from: 1,
-                to: 2,
+                from: 0,
+                to: 1,
                 count: 3,
             }
         );
