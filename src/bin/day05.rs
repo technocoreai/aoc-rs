@@ -35,7 +35,7 @@ impl MoveCommand {
 
 impl From<&str> for MoveCommand {
     fn from(s: &str) -> Self {
-        let tokens: Vec<&str> = s.split(" ").collect();
+        let tokens: Vec<&str> = s.split(' ').collect();
         parse_obj("move command", s, || match tokens[..] {
             ["move", count, "from", from, "to", to] => Some(MoveCommand {
                 from: from.parse::<usize>().ok()? - 1,
@@ -56,19 +56,20 @@ struct Input {
 }
 
 fn parse_layout_line(line: &str) -> Vec<(usize, char)> {
-    let foo: Vec<char> = line.chars().collect();
-    foo.chunks(4)
+    line.chars()
+        .collect::<Vec<char>>()
+        .chunks(4)
         .enumerate()
         .flat_map(|(idx, chunk)| match chunk {
-            ['[', crate_id, ']', ' '] => Some((idx, crate_id.clone())),
-            ['[', crate_id, ']'] => Some((idx, crate_id.clone())),
+            ['[', crate_id, ']', ' '] => Some((idx, *crate_id)),
+            ['[', crate_id, ']'] => Some((idx, *crate_id)),
             _ => None,
         })
         .collect()
 }
 
 fn parse_crate_layout(from: &str) -> CrateStacks {
-    let layout_lines: Vec<Vec<(usize, char)>> = from.split("\n").map(parse_layout_line).collect();
+    let layout_lines: Vec<Vec<(usize, char)>> = from.split('\n').map(parse_layout_line).collect();
     let expected_size = 1 + layout_lines
         .iter()
         .flat_map(|line| line.iter().map(|(stack_num, _)| stack_num))
@@ -80,8 +81,8 @@ fn parse_crate_layout(from: &str) -> CrateStacks {
         .collect();
     for items in layout_lines {
         for (stack_num, char) in items {
-            let foo = &mut result[stack_num];
-            foo.push_back(char);
+            let stack = &mut result[stack_num];
+            stack.push_back(char);
         }
     }
     result
@@ -95,10 +96,7 @@ impl From<&str> for Input {
 
         Input {
             crates: parse_crate_layout(layout),
-            commands: commands
-                .split("\n")
-                .map(|cmd| MoveCommand::from(cmd))
-                .collect(),
+            commands: commands.split('\n').map(MoveCommand::from).collect(),
         }
     }
 }
@@ -122,7 +120,7 @@ fn solve(input: &str, handler: fn(&MoveCommand, &mut CrateStacks)) -> String {
     }
     let topmost: Vec<String> = crates
         .into_iter()
-        .flat_map(|stack| stack.iter().nth(0).map(char::to_string))
+        .flat_map(|stack| stack.get(0).map(char::to_string))
         .collect();
     topmost.join("")
 }
