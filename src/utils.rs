@@ -1,10 +1,8 @@
 #[macro_export]
 macro_rules! aoc_main {
     ($p1:ident $(, $p2:ident)?) => {
-        use std::fs;
-
         let filename = format!("input/{}.txt", module_path!().replace("day", ""));
-        let contents = fs::read_to_string(filename).unwrap();
+        let contents = std::fs::read_to_string(filename).unwrap();
         let input = contents.as_str().trim_end();
 
         let parts = [$p1 $(, $p2) ?];

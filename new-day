@@ -6,7 +6,7 @@ DAY="$(date +'%d')"
 TASK_FILE="src/bin/day$DAY.rs"
 
 cat > "$TASK_FILE" << EOF
-use scaffolding::aoc_main;
+use utils::aoc_main;
 
 fn part1(input: &str) -> u32 {
     unimplemented!();
