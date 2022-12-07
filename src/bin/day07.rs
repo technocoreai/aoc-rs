@@ -41,12 +41,17 @@ impl Directory {
         }
     }
 
-    fn all_directories(&self) -> Vec<&Directory> {
-        let mut result = vec![self];
-        for subdir in self.subdirectories.values() {
-            result.extend(subdir.all_directories().iter());
+    fn walk_into<'a>(&'a self, into: &mut Vec<&'a Directory>) {
+        into.push(self);
+        for subdirectory in self.subdirectories.values() {
+            subdirectory.walk_into(into);
         }
-        result
+    }
+
+    fn walk(&self) -> impl Iterator<Item = &Directory> {
+        let mut result: Vec<&Directory> = Vec::new();
+        self.walk_into(&mut result);
+        result.into_iter()
     }
 }
 
@@ -126,8 +131,7 @@ fn parse_input(input: &str) -> Directory {
 
 fn part1(input: &str) -> usize {
     let root = parse_input(input);
-    root.all_directories()
-        .iter()
+    root.walk()
         .map(|d| d.total_size)
         .filter(|s| s < &100000)
         .sum()
@@ -140,8 +144,7 @@ fn part2(input: &str) -> usize {
     let root = parse_input(input);
     let free_space = disk_size - root.total_size;
 
-    root.all_directories()
-        .iter()
+    root.walk()
         .map(|d| d.total_size)
         .filter(|size| free_space + size >= required_space)
         .min()
