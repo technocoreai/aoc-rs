@@ -37,9 +37,6 @@ pub struct Matrix<T> {
     height: usize,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Coord(pub usize, pub usize);
-
 fn step(pos: usize, max: usize, delta: isize) -> Option<usize> {
     match delta.cmp(&0) {
         std::cmp::Ordering::Equal => Some(pos),
@@ -97,39 +94,34 @@ impl<T: Clone> Matrix<T> {
             .collect()
     }
 
-    pub fn elements(&self) -> impl Iterator<Item = (Coord, &T)> {
+    pub fn elements(&self) -> impl Iterator<Item = (usize, usize, &T)> {
         self.data.iter().enumerate().map(|(idx, elem)| {
-            let col = idx % self.width;
-            let row = idx / self.width;
-            (Coord(col, row), elem)
+            let x = idx % self.width;
+            let y = idx / self.width;
+            (x, y, elem)
         })
     }
 
-    pub fn elem(&self, col: usize, row: usize) -> &T {
-        let index = row * self.width + col;
+    pub fn elem(&self, x: usize, y: usize) -> &T {
+        let index = y * self.width + x;
         &self.data[index]
     }
 
-    pub fn elem_at(&self, coord: &Coord) -> &T {
-        let Coord(col, row) = coord;
-        self.elem(*col, *row)
-    }
-
-    pub fn elem_mut(&mut self, col: usize, row: usize) -> &mut T {
-        let index = row * self.width + col;
+    pub fn elem_mut(&mut self, x: usize, y: usize) -> &mut T {
+        let index = y * self.width + x;
         &mut self.data[index]
     }
 
-    pub fn elem_mut_at(&mut self, coord: &Coord) -> &mut T {
-        let Coord(col, row) = coord;
-        self.elem_mut(*col, *row)
-    }
-
-    pub fn step(&self, coord: &Coord, delta_x: isize, delta_y: isize) -> Option<Coord> {
-        let Coord(col, row) = coord;
-        let new_col = step(*col, self.width - 1, delta_x)?;
-        let new_row = step(*row, self.height - 1, delta_y)?;
-        Some(Coord(new_col, new_row))
+    pub fn step(
+        &self,
+        x: usize,
+        y: usize,
+        delta_x: isize,
+        delta_y: isize,
+    ) -> Option<(usize, usize)> {
+        let new_col = step(x, self.width - 1, delta_x)?;
+        let new_row = step(y, self.height - 1, delta_y)?;
+        Some((new_col, new_row))
     }
 }
 
@@ -182,15 +174,15 @@ mod tests {
         assert_eq!([21, 122, 6], matrix.row(1));
         assert_eq!(vec![&2, &122], matrix.column(1));
 
-        let expected_elements: Vec<(Coord, &u32)> = vec![
-            (Coord(0, 0), &5),
-            (Coord(1, 0), &2),
-            (Coord(2, 0), &3),
-            (Coord(0, 1), &21),
-            (Coord(1, 1), &122),
-            (Coord(2, 1), &6),
+        let expected_elements: Vec<(usize, usize, &u32)> = vec![
+            (0, 0, &5),
+            (1, 0, &2),
+            (2, 0, &3),
+            (0, 1, &21),
+            (1, 1, &122),
+            (2, 1, &6),
         ];
-        let elements: Vec<(Coord, &u32)> = matrix.elements().collect();
+        let elements: Vec<(usize, usize, &u32)> = matrix.elements().collect();
         assert_eq!(elements, expected_elements);
     }
 

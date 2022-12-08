@@ -1,5 +1,5 @@
 use std::cmp::max;
-use utils::{aoc_main, parse_obj, Coord, Matrix};
+use utils::{aoc_main, parse_obj, Matrix};
 
 fn parse(input: &str) -> Matrix<u32> {
     let mut result: Matrix<u32> = Matrix::empty();
@@ -17,21 +17,22 @@ fn parse(input: &str) -> Matrix<u32> {
 fn mark_visible(
     grid: &Matrix<u32>,
     visibility_grid: &mut Matrix<bool>,
-    initial: Coord,
+    initial_x: usize,
+    initial_y: usize,
     delta_x: isize,
     delta_y: isize,
 ) {
     let mut max_height: i64 = -1;
-    let mut coord = initial;
+    let (mut x, mut y) = (initial_x, initial_y);
     loop {
-        let new_height = *grid.elem_at(&coord) as i64;
+        let new_height = *grid.elem(x, y) as i64;
         if new_height > max_height {
-            *visibility_grid.elem_mut_at(&coord) = true;
+            *visibility_grid.elem_mut(x, y) = true;
         }
         max_height = max(new_height, max_height);
 
-        if let Some(next_coord) = grid.step(&coord, delta_x, delta_y) {
-            coord = next_coord
+        if let Some(next) = grid.step(x, y, delta_x, delta_y) {
+            (x, y) = next;
         } else {
             return;
         }
@@ -44,68 +45,56 @@ fn part1(input: &str) -> usize {
 
     // From the left
     for row in 0..grid.height() {
-        mark_visible(&grid, &mut visibility_grid, Coord(0, row), 1, 0);
+        mark_visible(&grid, &mut visibility_grid, 0, row, 1, 0);
     }
 
     // From the right
     for row in 0..grid.height() {
-        mark_visible(
-            &grid,
-            &mut visibility_grid,
-            Coord(grid.width() - 1, row),
-            -1,
-            0,
-        );
+        mark_visible(&grid, &mut visibility_grid, grid.width() - 1, row, -1, 0);
     }
 
     // From the top
     for col in 0..grid.width() {
-        mark_visible(&grid, &mut visibility_grid, Coord(col, 0), 0, 1);
+        mark_visible(&grid, &mut visibility_grid, col, 0, 0, 1);
     }
 
     // From the bottom
     for col in 0..grid.width() {
-        mark_visible(
-            &grid,
-            &mut visibility_grid,
-            Coord(col, grid.height() - 1),
-            0,
-            -1,
-        );
+        mark_visible(&grid, &mut visibility_grid, col, grid.height() - 1, 0, -1);
     }
 
     visibility_grid
         .elements()
-        .filter(|(_, visible)| **visible)
+        .filter(|(_, _, visible)| **visible)
         .count()
 }
 
-fn visible_trees(grid: &Matrix<u32>, coord: &Coord, delta_x: isize, delta_y: isize) -> u32 {
-    let mut current_position = coord.clone();
-    let initial_height = *grid.elem_at(&current_position);
+fn visible_trees(grid: &Matrix<u32>, x: usize, y: usize, delta_x: isize, delta_y: isize) -> u32 {
+    let (mut current_x, mut current_y) = (x, y);
+    let initial_height = *grid.elem(current_x, current_y);
     let mut visible_trees = 0;
-    while let Some(next_position) = grid.step(&current_position, delta_x, delta_y) {
+    while let Some(next) = grid.step(current_x, current_y, delta_x, delta_y) {
         visible_trees += 1;
-        current_position = next_position;
-        if *grid.elem_at(&current_position) >= initial_height {
+        (current_x, current_y) = next;
+        if *grid.elem(current_x, current_y) >= initial_height {
             break;
         }
     }
     visible_trees
 }
 
-fn scenic_score(grid: &Matrix<u32>, coord: Coord) -> u32 {
-    let up = visible_trees(grid, &coord, 0, -1);
-    let down = visible_trees(grid, &coord, 0, 1);
-    let left = visible_trees(grid, &coord, 1, 0);
-    let right = visible_trees(grid, &coord, -1, 0);
+fn scenic_score(grid: &Matrix<u32>, x: usize, y: usize) -> u32 {
+    let up = visible_trees(grid, x, y, 0, -1);
+    let down = visible_trees(grid, x, y, 0, 1);
+    let left = visible_trees(grid, x, y, 1, 0);
+    let right = visible_trees(grid, x, y, -1, 0);
     up * down * left * right
 }
 
 fn part2(input: &str) -> u32 {
     let grid = parse(input);
     grid.elements()
-        .map(|(pos, _)| scenic_score(&grid, pos))
+        .map(|(x, y, _)| scenic_score(&grid, x, y))
         .max()
         .unwrap()
 }
@@ -132,7 +121,7 @@ mod tests {
     #[test]
     fn test_part2() {
         let grid = parse(EXAMPLE_INPUT);
-        assert_eq!(scenic_score(&grid, Coord(2, 1)), 4);
-        assert_eq!(scenic_score(&grid, Coord(2, 3)), 8);
+        assert_eq!(scenic_score(&grid, 2, 1), 4);
+        assert_eq!(scenic_score(&grid, 2, 3), 8);
     }
 }
