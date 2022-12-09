@@ -40,9 +40,7 @@ EOF
 git add "$TASK_FILE"
 
 if [[ -f ~/Downloads/input.txt ]]; then
-    INPUT_FILE="input/$DAY.txt"
-    mv ~/Downloads/input.txt "$INPUT_FILE"
-    git add "$INPUT_FILE"
+    mv ~/Downloads/input.txt "input/$DAY.txt"
 fi
 
 _idea "$(dirname "$(realpath "$0")")" "$TASK_FILE"
