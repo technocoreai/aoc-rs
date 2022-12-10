@@ -127,21 +127,10 @@ impl<T: Clone> Matrix<T> {
 
 impl<T: std::fmt::Display> std::fmt::Display for Matrix<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatted_elems: Vec<String> =
-            self.data.iter().map(|elem| format!("{}", elem)).collect();
-        let max_width = formatted_elems
-            .iter()
-            .map(|element| element.chars().count())
-            .max()
-            .unwrap_or(0);
-
         for row in 0..self.height {
             for col in 0..self.width {
-                let elem = &formatted_elems[row * self.width + col];
-                write!(f, "{:>max_width$}", elem)?;
-                if col < self.width - 1 {
-                    write!(f, " ")?
-                }
+                let elem = &self.data[row * self.width + col];
+                elem.fmt(f)?;
             }
             if row < self.height - 1 {
                 writeln!(f)?
@@ -168,8 +157,8 @@ mod tests {
         assert_eq!(matrix.height, 2);
         assert_eq!(matrix.elem(1, 1), &122);
         *matrix.elem_mut(0, 0) = 5;
-        let expected_str = vec!["  5   2   3", " 21 122   6"].join("\n");
-        assert_eq!(format!("{}", matrix), expected_str);
+        let expected_str = vec!["   5   2   3", "  21 122   6"].join("\n");
+        assert_eq!(format!("{:>4}", matrix), expected_str);
 
         assert_eq!([21, 122, 6], matrix.row(1));
         assert_eq!(vec![&2, &122], matrix.column(1));
@@ -189,7 +178,7 @@ mod tests {
     #[test]
     pub fn test_fill() {
         let matrix: Matrix<char> = Matrix::fill('x', 2, 3);
-        let expected_str = vec!["x x", "x x", "x x"].join("\n");
+        let expected_str = vec!["xx", "xx", "xx"].join("\n");
         assert_eq!(format!("{}", matrix), expected_str);
     }
 }

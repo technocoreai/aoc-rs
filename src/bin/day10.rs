@@ -52,7 +52,7 @@ fn probe(cycle: usize) -> bool {
 
 fn part2(input: &str) -> String {
     let mut reg_x: i64 = 1;
-    let mut result = Matrix::fill('.', 40, 6);
+    let mut result = Matrix::fill(' ', 40, 6);
 
     for (idx, instruction) in input.lines().flat_map(MicroInstruction::parse).enumerate() {
         let column = idx % result.width();
@@ -60,7 +60,7 @@ fn part2(input: &str) -> String {
         let lit = reg_x.abs_diff(column as i64) <= 1;
 
         if lit {
-            *result.elem_mut(column, row) = '#';
+            *result.elem_mut(column, row) = '█';
         }
 
         reg_x = match instruction {
@@ -68,7 +68,7 @@ fn part2(input: &str) -> String {
             AddX(addend) => reg_x + (addend as i64),
         };
     }
-    format!("\n{}", result).replace(' ', "")
+    format!("\n{}", result)
 }
 
 fn main() {
@@ -241,12 +241,12 @@ noop";
     fn test_part2() {
         let expected = vec![
             "",
-            "##..##..##..##..##..##..##..##..##..##..",
-            "###...###...###...###...###...###...###.",
-            "####....####....####....####....####....",
-            "#####.....#####.....#####.....#####.....",
-            "######......######......######......####",
-            "#######.......#######.......#######.....",
+            "██  ██  ██  ██  ██  ██  ██  ██  ██  ██  ",
+            "███   ███   ███   ███   ███   ███   ███ ",
+            "████    ████    ████    ████    ████    ",
+            "█████     █████     █████     █████     ",
+            "██████      ██████      ██████      ████",
+            "███████       ███████       ███████     ",
         ]
         .join("\n");
         assert_eq!(part2(EXAMPLE_INPUT), expected);
