@@ -30,6 +30,33 @@ pub fn parse_obj<T, F: FnOnce() -> Option<T>>(kind: &str, value: &str, parse_fn:
     parse(error_msg.as_str(), parse_fn)
 }
 
+pub fn parse_peg<T>(
+    input: &str,
+    parse_fn: fn(&str) -> Result<T, peg::error::ParseError<peg::str::LineCol>>,
+) -> T {
+    match parse_fn(input) {
+        Ok(result) => result,
+        Err(error) => {
+            let mut context_msg = String::new();
+            let context_start = error.location.line.saturating_sub(3);
+
+            for (idx, line) in input
+                .lines()
+                .enumerate()
+                .skip(context_start)
+                .take(error.location.line + 3 - context_start)
+            {
+                context_msg.push_str(format!(" | {}\n", line).as_str());
+                if idx == error.location.line - 1 {
+                    context_msg
+                        .push_str(format!(" | {:>1$}\n", "^", error.location.column).as_str());
+                }
+            }
+            panic!("Error while parsing: expected {}\n\n{}", error, context_msg)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Matrix<T> {
     data: Vec<T>,

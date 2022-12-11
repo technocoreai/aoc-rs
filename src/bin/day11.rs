@@ -1,9 +1,8 @@
-extern crate peg;
-use utils::aoc_main;
+use utils::{aoc_main, parse_peg};
 
 peg::parser! {
     grammar monkey_parser() for str {
-        rule ws() = [' '|'\n']*
+        rule ws() = quiet!{[' '|'\n']*}
 
         rule i64() -> i64
             = n:$(['0'..='9']+) { ? n.parse::<i64>().or(Err("i64")) }
@@ -25,7 +24,7 @@ peg::parser! {
         rule usize() -> usize
             = v:i64() { ? usize::try_from(v).or(Err("usize")) }
 
-        pub rule monkey() -> Monkey
+        rule monkey() -> Monkey
             = "Monkey" ws() i64() ":" ws()
               "Starting items:" ws() items:item_list() ws()
               "Operation: new =" ws() operation:operation_expr() ws()
@@ -40,6 +39,9 @@ peg::parser! {
                     throw_if_false,
                 }
         }
+
+        pub rule monkey_list() -> Vec<Monkey>
+            = result:(monkey() ** ws()) { result }
     }
 }
 
@@ -103,16 +105,9 @@ impl Monkey {
 }
 
 fn simulate(input: &str, rounds: usize, reduce_worry_level: fn(i64) -> i64, debug: bool) -> usize {
-    let mut monkeys: Vec<Monkey> = input
-        .split("\n\n")
-        .map(|monkey_declaration| {
-            monkey_parser::monkey(monkey_declaration).unwrap_or_else(|err| {
-                panic!("Unable to parse monkey: {}\n{}", err, monkey_declaration);
-            })
-        })
-        .collect();
+    let mut monkeys: Vec<Monkey> = parse_peg(input, monkey_parser::monkey_list);
     let mut inspections: Vec<usize> = vec![0; monkeys.len()];
-    let common_divisor: i64 = monkeys.iter().map(|v| v.divide_by).product();
+    let common_multiple: i64 = monkeys.iter().map(|v| v.divide_by).product();
     for round in 0..rounds {
         if debug {
             println!("Turn {}", round);
@@ -121,7 +116,7 @@ fn simulate(input: &str, rounds: usize, reduce_worry_level: fn(i64) -> i64, debu
             let throws: Vec<(usize, i64)> = monkeys[idx].process_items(reduce_worry_level);
             inspections[idx] += throws.len();
             for (idx, value) in throws {
-                monkeys[idx].items.push(value % common_divisor);
+                monkeys[idx].items.push(value % common_multiple);
             }
         }
         if debug {
