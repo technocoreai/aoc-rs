@@ -1,19 +1,55 @@
-use utils::{aoc_main, parse_obj};
+extern crate peg;
+use utils::aoc_main;
+
+peg::parser! {
+    grammar monkey_parser() for str {
+        rule ws() = [' '|'\n']*
+
+        rule i64() -> i64
+            = n:$(['0'..='9']+) { ? n.parse::<i64>().or(Err("i64")) }
+
+        rule value() -> Value
+            = "old" { Value::OldValue }
+            / v:i64() { Value::Const(v) }
+
+        rule operation_expr() -> Operation
+            = a:value() ws() "*" ws() b:value() { Operation::Multiply(a, b) }
+            / a:value() ws() "+" ws() b:value() { Operation::Add(a, b) }
+
+        rule divisible_by() -> i64
+            = "Test: divisible by" ws() v:i64() { v }
+
+        rule item_list() -> Vec<i64>
+            = v:(i64() ** ", ") { v }
+
+        rule usize() -> usize
+            = v:i64() { ? usize::try_from(v).or(Err("usize")) }
+
+        pub rule monkey() -> Monkey
+            = "Monkey" ws() i64() ":" ws()
+              "Starting items:" ws() items:item_list() ws()
+              "Operation: new =" ws() operation:operation_expr() ws()
+              "Test: divisible by" ws() divide_by:i64() ws()
+              "If true: throw to monkey" ws() throw_if_true:usize() ws()
+              "If false: throw to monkey" ws() throw_if_false:usize() ws() {
+                Monkey {
+                    items,
+                    operation,
+                    divide_by,
+                    throw_if_true,
+                    throw_if_false,
+                }
+        }
+    }
+}
 
 #[derive(Debug)]
-enum Value {
+pub enum Value {
     Const(i64),
     OldValue,
 }
 
 impl Value {
-    fn parse(token: &str) -> Option<Value> {
-        match token {
-            "old" => Some(Value::OldValue),
-            num => num.parse().ok().map(Value::Const),
-        }
-    }
-
     fn evaluate(&self, old_value: i64) -> i64 {
         match self {
             Value::Const(value) => *value,
@@ -23,20 +59,12 @@ impl Value {
 }
 
 #[derive(Debug)]
-enum Operation {
+pub enum Operation {
     Add(Value, Value),
     Multiply(Value, Value),
 }
 
 impl Operation {
-    fn parse(expr: &str) -> Option<Operation> {
-        match tokens(expr).as_slice() {
-            [a, "+", b] => Some(Operation::Add(Value::parse(a)?, Value::parse(b)?)),
-            [a, "*", b] => Some(Operation::Multiply(Value::parse(a)?, Value::parse(b)?)),
-            _ => None,
-        }
-    }
-
     fn evaluate(&self, old_value: i64) -> i64 {
         match self {
             Operation::Add(a, b) => a.evaluate(old_value) + b.evaluate(old_value),
@@ -45,12 +73,8 @@ impl Operation {
     }
 }
 
-fn tokens(string: &str) -> Vec<&str> {
-    string.split_whitespace().collect()
-}
-
 #[derive(Debug)]
-struct Monkey {
+pub struct Monkey {
     items: Vec<i64>,
     operation: Operation,
     divide_by: i64,
@@ -59,46 +83,6 @@ struct Monkey {
 }
 
 impl Monkey {
-    fn parse_items(line: &str) -> Option<Vec<i64>> {
-        let (_, value) = line.split_once(": ")?;
-        value
-            .trim()
-            .split(", ")
-            .map(|v| v.parse::<i64>().ok())
-            .collect()
-    }
-
-    fn parse_divide_by(line: &str) -> Option<i64> {
-        line.split_whitespace()
-            .last()
-            .and_then(|value| value.parse().ok())
-    }
-
-    fn parse_throw(line: &str) -> Option<usize> {
-        line.split_whitespace()
-            .last()
-            .and_then(|value| value.parse().ok())
-    }
-
-    fn parse(block: &str) -> Monkey {
-        parse_obj("monkey", block, || {
-            let lines: Vec<&str> = block.lines().collect();
-            match lines.as_slice() {
-                [_, starting_items, operation, test, if_true, if_false] => Some(Monkey {
-                    items: Monkey::parse_items(starting_items)?,
-                    operation: {
-                        let (_, op) = operation.split_once(" = ")?;
-                        Operation::parse(op)?
-                    },
-                    divide_by: Monkey::parse_divide_by(test)?,
-                    throw_if_true: Monkey::parse_throw(if_true)?,
-                    throw_if_false: Monkey::parse_throw(if_false)?,
-                }),
-                _ => None,
-            }
-        })
-    }
-
     fn process_items(&mut self, reduce_worry_level: fn(i64) -> i64) -> Vec<(usize, i64)> {
         let result = self
             .items
@@ -119,7 +103,14 @@ impl Monkey {
 }
 
 fn simulate(input: &str, rounds: usize, reduce_worry_level: fn(i64) -> i64, debug: bool) -> usize {
-    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(Monkey::parse).collect();
+    let mut monkeys: Vec<Monkey> = input
+        .split("\n\n")
+        .map(|monkey_declaration| {
+            monkey_parser::monkey(monkey_declaration).unwrap_or_else(|err| {
+                panic!("Unable to parse monkey: {}\n{}", err, monkey_declaration);
+            })
+        })
+        .collect();
     let mut inspections: Vec<usize> = vec![0; monkeys.len()];
     let common_divisor: i64 = monkeys.iter().map(|v| v.divide_by).product();
     for round in 0..rounds {

@@ -8,3 +8,4 @@ name = "utils"
 path = "src/utils.rs"
 
 [dependencies]
+peg = "0.8.1"
