@@ -139,6 +139,27 @@ impl<T: Clone> Matrix<T> {
         &mut self.data[index]
     }
 
+    pub fn neighbours(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
+        if x >= self.width || y >= self.height {
+            panic!("Out of bounds: ({x}, {y})")
+        }
+
+        let mut result = Vec::with_capacity(4);
+        if x > 0 {
+            result.push((x - 1, y));
+        }
+        if y > 0 {
+            result.push((x, y - 1));
+        }
+        if x < self.width - 1 {
+            result.push((x + 1, y));
+        }
+        if y < self.height - 1 {
+            result.push((x, y + 1));
+        }
+        result
+    }
+
     pub fn step(
         &self,
         x: usize,
@@ -203,9 +224,20 @@ mod tests {
     }
 
     #[test]
-    pub fn test_fill() {
+    pub fn test_matrix_fill() {
         let matrix: Matrix<char> = Matrix::fill('x', 2, 3);
         let expected_str = vec!["xx", "xx", "xx"].join("\n");
         assert_eq!(format!("{}", matrix), expected_str);
+    }
+
+    #[test]
+    pub fn test_matrix_neighbours() {
+        let matrix: Matrix<i32> = Matrix::fill(1, 3, 3);
+        assert_eq!(vec![(1, 0), (0, 1)], matrix.neighbours(0, 0));
+        assert_eq!(
+            vec![(0, 1), (1, 0), (2, 1), (1, 2)],
+            matrix.neighbours(1, 1)
+        );
+        assert_eq!(vec![(1, 2), (2, 1)], matrix.neighbours(2, 2));
     }
 }
