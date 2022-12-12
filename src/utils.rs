@@ -134,9 +134,27 @@ impl<T: Clone> Matrix<T> {
         &self.data[index]
     }
 
+    pub fn elem_at(&self, coords: (usize, usize)) -> &T {
+        let (x, y) = coords;
+        self.elem(x, y)
+    }
+
     pub fn elem_mut(&mut self, x: usize, y: usize) -> &mut T {
         let index = y * self.width + x;
         &mut self.data[index]
+    }
+
+    pub fn elem_mut_at(&mut self, coords: (usize, usize)) -> &mut T {
+        let (x, y) = coords;
+        self.elem_mut(x, y)
+    }
+
+    pub fn update(&mut self, x: usize, y: usize, value: T) {
+        *self.elem_mut(x, y) = value
+    }
+
+    pub fn update_at(&mut self, coords: (usize, usize), value: T) {
+        *self.elem_mut_at(coords) = value
     }
 
     pub fn neighbours(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
