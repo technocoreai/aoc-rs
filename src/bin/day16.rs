@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use utils::{aoc_main, parse_peg};
 
 peg::parser! {
@@ -15,7 +16,7 @@ peg::parser! {
         rule flow_rate() -> i64
             = "has flow rate=" v:integer() ";" { v }
 
-        rule targets() -> HashSet<RoomID>
+        rule targets() -> Vec<RoomID>
             = ("tunnels"/"tunnel") ws() ("leads"/"lead") ws()
               "to" ws() ("valves"/"valve") ws()
               v:(valve_id() ** ", ") { v.into_iter().collect() }
@@ -25,8 +26,8 @@ peg::parser! {
                flow_rate:flow_rate() ws()
                tunnels:targets() { (id, Room { flow_rate, tunnels }) }
 
-        pub rule input() -> HashMap<RoomID, Room>
-            = v:(room() ** "\n") { v.into_iter().collect() }
+        pub rule input() -> Cave
+            = v:(room() ** "\n") { Cave::new(v) }
     }
 }
 
@@ -52,179 +53,479 @@ impl Display for RoomID {
 #[derive(Debug)]
 pub struct Room {
     flow_rate: i64,
-    tunnels: HashSet<RoomID>,
+    tunnels: Vec<RoomID>,
 }
 
-type Cave = HashMap<RoomID, Room>;
+#[derive(Debug)]
+pub struct Cave {
+    tunnels: BTreeMap<RoomID, Vec<RoomID>>,
+    flow_rates: BTreeMap<RoomID, i64>,
+}
+
+impl Cave {
+    fn new(rooms: Vec<(RoomID, Room)>) -> Cave {
+        let flow_rates = rooms
+            .iter()
+            .filter_map(|(room_id, room)| {
+                if room.flow_rate > 0 {
+                    Some((*room_id, room.flow_rate))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let tunnels = rooms
+            .into_iter()
+            .map(|(room_id, room)| (room_id, room.tunnels))
+            .collect();
+        Cave {
+            tunnels,
+            flow_rates,
+        }
+    }
+
+    fn get_flow_rate(&self, room_id: &RoomID) -> i64 {
+        *self
+            .flow_rates
+            .get(room_id)
+            .unwrap_or_else(|| panic!("No flow rate for {room_id}"))
+    }
+
+    fn get_tunnels(&self, room_id: &RoomID) -> &Vec<RoomID> {
+        self.tunnels
+            .get(room_id)
+            .unwrap_or_else(|| panic!("No tunnels for {room_id}"))
+    }
+
+    fn unopened_valves(&self) -> Vec<RoomID> {
+        let mut rooms: Vec<(i64, RoomID)> = self
+            .flow_rates
+            .iter()
+            .map(|(room_id, flow_rate)| (*flow_rate, *room_id))
+            .collect();
+        rooms.sort();
+        rooms.reverse();
+        rooms.into_iter().map(|(_, room_id)| room_id).collect()
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 struct TurnState {
     remaining_turns: i64,
     pressure_released: i64,
     total_flow_rate: i64,
+    best_score_at_end: i64,
 }
 
 impl TurnState {
+    fn initial(remaining_turns: i64, cave: &Cave, player_count: usize) -> Self {
+        TurnState::new(
+            remaining_turns,
+            0,
+            0,
+            cave,
+            &cave.unopened_valves(),
+            player_count,
+        )
+    }
+
+    fn new(
+        remaining_turns: i64,
+        pressure_released: i64,
+        total_flow_rate: i64,
+        cave: &Cave,
+        unopened_valves: &[RoomID],
+        player_count: usize,
+    ) -> Self {
+        let mut best_score_at_end = pressure_released;
+        let mut current_flow_rate = total_flow_rate;
+        let mut current_remaining_turns = remaining_turns;
+
+        let flow_rate_adjustments = unopened_valves.chunks(player_count).map(|chunk| {
+            chunk
+                .iter()
+                .map(|room| cave.get_flow_rate(room))
+                .sum::<i64>()
+        });
+
+        for adjustment in flow_rate_adjustments {
+            if current_remaining_turns == 0 {
+                break;
+            }
+
+            // Open
+            current_remaining_turns -= 1;
+            best_score_at_end += current_flow_rate;
+            current_flow_rate += adjustment;
+        }
+        best_score_at_end += current_remaining_turns * current_flow_rate;
+
+        TurnState {
+            remaining_turns,
+            pressure_released,
+            total_flow_rate,
+            best_score_at_end,
+        }
+    }
+
     fn score_at_end(&self) -> i64 {
         self.pressure_released + self.total_flow_rate * self.remaining_turns
     }
+
+    fn worse_than(&self, other: &Self) -> bool {
+        if self.best_score_at_end < other.best_score_at_end {
+            return true;
+        }
+
+        if self.pressure_released <= other.pressure_released {
+            self.remaining_turns <= other.remaining_turns
+        } else {
+            false
+        }
+    }
+
+    fn advance(&self, cave: &Cave, unopened_valves: &[RoomID], player_count: usize) -> Self {
+        if self.remaining_turns < 1 {
+            panic!("Cannot advance past end");
+        }
+        TurnState::new(
+            self.remaining_turns - 1,
+            self.pressure_released + self.total_flow_rate,
+            self.total_flow_rate,
+            cave,
+            unopened_valves,
+            player_count,
+        )
+    }
+
+    fn opening_valve(
+        &self,
+        flow_rate: i64,
+        cave: &Cave,
+        unopened_valves: &[RoomID],
+        player_count: usize,
+    ) -> Self {
+        if self.remaining_turns < 1 {
+            panic!("Cannot advance past end");
+        }
+        TurnState::new(
+            self.remaining_turns - 1,
+            self.pressure_released + self.total_flow_rate,
+            self.total_flow_rate + flow_rate,
+            cave,
+            unopened_valves,
+            player_count,
+        )
+    }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct CaveState {
+trait CaveState: Sized + Debug + PartialEq + Eq + PartialOrd + Ord + Hash + Clone {
+    fn next_states(&self, cave: &Cave, turn_state: &TurnState) -> Vec<(TurnState, Self)>;
+    fn player_count(&self) -> usize;
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+struct CaveStateSimple {
     current_room: RoomID,
-    pending_valves: Vec<RoomID>,
+    unopened_valves: Vec<RoomID>,
+}
+
+impl CaveStateSimple {
+    fn moving_to_room(&self, room: RoomID) -> Self {
+        CaveStateSimple {
+            current_room: room,
+            unopened_valves: self.unopened_valves.clone(),
+        }
+    }
+
+    fn opening_valve(&self) -> Self {
+        let mut valves = self.unopened_valves.clone();
+        valves.retain(|r| *r != self.current_room);
+
+        CaveStateSimple {
+            current_room: self.current_room,
+            unopened_valves: valves,
+        }
+    }
+}
+
+impl CaveState for CaveStateSimple {
+    fn next_states(&self, cave: &Cave, turn_state: &TurnState) -> Vec<(TurnState, Self)> {
+        let mut result = vec![];
+
+        if turn_state.remaining_turns <= 1 {
+            return result;
+        }
+
+        if self.unopened_valves.contains(&self.current_room) {
+            let next_cave_state = self.opening_valve();
+            let next_turn_state = turn_state.opening_valve(
+                cave.get_flow_rate(&self.current_room),
+                cave,
+                &next_cave_state.unopened_valves,
+                1,
+            );
+            result.push((next_turn_state, next_cave_state))
+        }
+
+        for next_room in cave.get_tunnels(&self.current_room).iter() {
+            let next_cave_state = self.moving_to_room(*next_room);
+            let next_turn_state = turn_state.advance(cave, &next_cave_state.unopened_valves, 1);
+            result.push((next_turn_state, next_cave_state))
+        }
+
+        result
+    }
+
+    fn player_count(&self) -> usize {
+        1
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+struct CaveStateElephant {
+    player_room: RoomID,
+    elephant_room: RoomID,
+    unopened_valves: Vec<RoomID>,
+}
+
+impl CaveStateElephant {
+    fn moving_player(&self, room: RoomID) -> Self {
+        CaveStateElephant {
+            player_room: self.elephant_room.min(room),
+            elephant_room: self.elephant_room.max(room),
+            unopened_valves: self.unopened_valves.clone(),
+        }
+    }
+
+    fn moving_elephant(&self, room: RoomID) -> Self {
+        CaveStateElephant {
+            player_room: self.player_room.min(room),
+            elephant_room: self.player_room.max(room),
+            unopened_valves: self.unopened_valves.clone(),
+        }
+    }
+
+    fn moving_both(&self, player_room: RoomID, elephant_room: RoomID) -> Self {
+        CaveStateElephant {
+            player_room: player_room.min(elephant_room),
+            elephant_room: player_room.max(elephant_room),
+            unopened_valves: self.unopened_valves.clone(),
+        }
+    }
+
+    fn opening_valve(&self, room: RoomID) -> Self {
+        let mut valves = self.unopened_valves.clone();
+        valves.retain(|r| *r != room);
+
+        CaveStateElephant {
+            player_room: self.player_room,
+            elephant_room: self.elephant_room,
+            unopened_valves: valves,
+        }
+    }
+}
+
+impl CaveState for CaveStateElephant {
+    fn next_states(&self, cave: &Cave, turn_state: &TurnState) -> Vec<(TurnState, Self)> {
+        let mut result = vec![];
+
+        if turn_state.remaining_turns <= 1 {
+            return result;
+        }
+
+        // Both open
+        if self.player_room != self.elephant_room
+            && self.unopened_valves.contains(&self.player_room)
+            && self.unopened_valves.contains(&self.elephant_room)
+        {
+            let next_cave_state = self
+                .opening_valve(self.player_room)
+                .opening_valve(self.elephant_room);
+            let next_turn_state = turn_state.opening_valve(
+                cave.get_flow_rate(&self.player_room) + cave.get_flow_rate(&self.elephant_room),
+                cave,
+                &next_cave_state.unopened_valves,
+                2,
+            );
+            result.push((next_turn_state, next_cave_state))
+        }
+
+        // Player opens, elephant moves
+        if self.unopened_valves.contains(&self.player_room) {
+            for next_room in cave.get_tunnels(&self.elephant_room).iter() {
+                let next_cave_state = self
+                    .moving_elephant(*next_room)
+                    .opening_valve(self.player_room);
+                let next_turn_state = turn_state.opening_valve(
+                    cave.get_flow_rate(&self.player_room),
+                    cave,
+                    &next_cave_state.unopened_valves,
+                    2,
+                );
+                result.push((next_turn_state, next_cave_state))
+            }
+        }
+
+        // Elephant opens, player moves
+        if self.unopened_valves.contains(&self.elephant_room) {
+            for next_room in cave.get_tunnels(&self.player_room).iter() {
+                let next_cave_state = self
+                    .moving_player(*next_room)
+                    .opening_valve(self.elephant_room);
+                let next_turn_state = turn_state.opening_valve(
+                    cave.get_flow_rate(&self.elephant_room),
+                    cave,
+                    &next_cave_state.unopened_valves,
+                    2,
+                );
+                result.push((next_turn_state, next_cave_state))
+            }
+        }
+
+        // Both move
+        for next_player_room in cave.get_tunnels(&self.player_room).iter() {
+            for next_elephant_room in cave.get_tunnels(&self.elephant_room).iter() {
+                let next_cave_state = self.moving_both(*next_player_room, *next_elephant_room);
+                let next_turn_state = turn_state.advance(cave, &next_cave_state.unopened_valves, 2);
+                result.push((next_turn_state, next_cave_state))
+            }
+        }
+
+        result
+    }
+
+    fn player_count(&self) -> usize {
+        2
+    }
 }
 
 fn parse_input(input: &str) -> Cave {
     parse_peg(input, input_parser::input)
 }
 
-fn pop(states: &mut HashSet<CaveState>) -> Option<CaveState> {
-    let result = states.iter().next().cloned();
-    for item in &result {
-        states.remove(item);
+fn remove_matching<T, F: Fn(&T) -> bool>(from: &mut Vec<T>, predicate: F) {
+    let mut i = 0;
+    while i < from.len() {
+        if predicate(&from[i]) {
+            from.remove(i);
+        } else {
+            i += 1;
+        }
     }
-    result
 }
 
-fn next_states(
-    cave: &Cave,
-    turn_state: &TurnState,
-    cave_state: &CaveState,
-) -> Vec<(TurnState, CaveState)> {
-    let mut result = vec![];
+const DEBUG: bool = false;
+const DEBUG_OCCASIONAL: bool = true;
+const DEBUG_SKIPS: bool = false;
 
-    if turn_state.remaining_turns <= 1 {
-        return result;
-    }
-
-    let current_room = cave.get(&cave_state.current_room).unwrap();
-
-    if cave_state.pending_valves.contains(&cave_state.current_room) {
-        let next_turn_state = TurnState {
-            remaining_turns: turn_state.remaining_turns - 1,
-            total_flow_rate: turn_state.total_flow_rate + current_room.flow_rate,
-            pressure_released: turn_state.pressure_released + turn_state.total_flow_rate,
-        };
-        let next_cave_state = CaveState {
-            current_room: cave_state.current_room,
-            pending_valves: cave_state
-                .pending_valves
-                .iter()
-                .copied()
-                .filter(|v| *v != cave_state.current_room)
-                .collect(),
-        };
-        result.push((next_turn_state, next_cave_state))
-    }
-
-    for next_room in current_room.tunnels.iter() {
-        let next_turn_state = TurnState {
-            remaining_turns: turn_state.remaining_turns - 1,
-            pressure_released: turn_state.pressure_released + turn_state.total_flow_rate,
-            total_flow_rate: turn_state.total_flow_rate,
-        };
-        let next_cave_state = CaveState {
-            current_room: *next_room,
-            pending_valves: cave_state.pending_valves.clone(),
-        };
-        result.push((next_turn_state, next_cave_state))
-    }
-
-    result
-}
-
-fn solve_part1(input: &str, debug: bool) -> i64 {
+fn solve<T: CaveState>(
+    input: &str,
+    make_initial: fn(Vec<RoomID>) -> T,
+    initial_remaining_time: i64,
+) -> i64 {
     let cave = parse_input(input);
-    let mut best_states: HashMap<CaveState, Vec<TurnState>> = HashMap::new();
-    let mut pending: HashSet<CaveState> = HashSet::new();
-    println!("{:?}", cave);
-    println!();
+    let mut best_states: BTreeMap<T, Vec<TurnState>> = BTreeMap::new();
+    let mut pending: BTreeSet<T> = BTreeSet::new();
 
-    let initial_state = CaveState {
-        current_room: RoomID::INITIAL,
-        pending_valves: cave
-            .iter()
-            .filter_map(
-                |(id, room)| {
-                    if room.flow_rate > 0 {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                },
-            )
-            .collect(),
-    };
+    let initial_state = make_initial(cave.unopened_valves());
     best_states.insert(
         initial_state.clone(),
-        vec![TurnState {
-            remaining_turns: 30,
-            pressure_released: 0,
-            total_flow_rate: 0,
-        }],
+        vec![TurnState::initial(
+            initial_remaining_time,
+            &cave,
+            initial_state.player_count(),
+        )],
     );
     pending.insert(initial_state);
 
     let mut max_score: i64 = 0;
+    let mut evaluated = 0;
 
-    while let Some(cave_state) = pop(&mut pending) {
+    while let Some(cave_state) = pending.pop_first() {
+        evaluated += 1;
+        let debug = DEBUG || (DEBUG_OCCASIONAL && evaluated % 50000 == 0);
+
         let turn_states = best_states.get(&cave_state).unwrap_or(&vec![]).clone();
         if debug {
-            println!("Evaluating {cave_state:?}");
+            println!(
+                "Evaluating {cave_state:?} ({evaluated} evaluated, {} pending)",
+                pending.len()
+            );
         }
 
         for turn_state in turn_states {
             if debug {
                 println!(" - Using {turn_state:?} ({})", turn_state.score_at_end());
             }
-            max_score = max_score.max(turn_state.score_at_end());
 
-            for (next_turn_state, next_cave_state) in next_states(&cave, &turn_state, &cave_state) {
-                if debug {
-                    println!("   - Next: {next_cave_state:?}");
-                    println!("           {next_turn_state:?}");
-                }
-
+            for (next_turn_state, next_cave_state) in cave_state.next_states(&cave, &turn_state) {
                 let mut existing_states = best_states
                     .get(&next_cave_state)
                     .cloned()
                     .unwrap_or_default();
 
-                if let Some(better_state) = existing_states.iter().find(|existing_state| {
-                    if next_turn_state.pressure_released <= existing_state.pressure_released {
-                        next_turn_state.remaining_turns <= existing_state.remaining_turns
-                    } else {
-                        false
-                    }
-                }) {
-                    if debug {
-                        println!("    [skip] {:?}", better_state);
+                if let Some(better_state) = existing_states
+                    .iter()
+                    .find(|existing_state| next_turn_state.worse_than(existing_state))
+                {
+                    if debug && DEBUG_SKIPS {
+                        println!("   - Next: {next_cave_state:?}");
+                        println!("           {next_turn_state:?}");
+                        println!("    [skip] {better_state:?}");
                     }
                     continue;
                 }
 
+                if next_turn_state.best_score_at_end < max_score {
+                    continue;
+                }
+                max_score = max_score.max(next_turn_state.score_at_end());
+
+                if debug {
+                    println!("   - Next: {next_cave_state:?}");
+                    println!("           {next_turn_state:?}");
+                }
+
+                remove_matching(&mut existing_states, |existing_state| {
+                    existing_state.worse_than(&next_turn_state)
+                });
                 existing_states.push(next_turn_state);
                 best_states.insert(next_cave_state.clone(), existing_states);
                 pending.insert(next_cave_state);
             }
         }
     }
+    println!("Evaluated {evaluated} states");
 
     max_score
 }
 
 fn part1(input: &str) -> i64 {
-    solve_part1(input, false)
+    solve(
+        input,
+        |valves| CaveStateSimple {
+            current_room: RoomID::INITIAL,
+            unopened_valves: valves,
+        },
+        30,
+    )
 }
 
-fn part2(input: &str) -> u32 {
-    unimplemented!();
+fn part2(input: &str) -> i64 {
+    solve(
+        input,
+        |valves| CaveStateElephant {
+            player_room: RoomID::INITIAL,
+            elephant_room: RoomID::INITIAL,
+            unopened_valves: valves,
+        },
+        26,
+    )
 }
 
 fn main() {
-    aoc_main!(part1);
+    aoc_main!(part1, part2);
 }
 
 #[cfg(test)]
@@ -247,8 +548,8 @@ Valve JJ has flow rate=21; tunnel leads to valve II";
         assert_eq!(part1(EXAMPLE_INPUT), 1651);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 1707);
+    }
 }
