@@ -57,148 +57,135 @@ pub fn parse_peg<T>(
     }
 }
 
+pub type Point2D = [usize; 2];
+pub type Point3D = [usize; 3];
+
 #[derive(Debug)]
-pub struct Matrix<T> {
+pub struct Matrix<T, const DIMS: usize> {
     data: Vec<T>,
-    width: usize,
-    height: usize,
+    dimensions: [usize; DIMS],
 }
 
-fn step(pos: usize, max: usize, delta: isize) -> Option<usize> {
-    match delta.cmp(&0) {
-        std::cmp::Ordering::Equal => Some(pos),
-        std::cmp::Ordering::Less => pos.checked_sub(delta.wrapping_abs() as usize),
-        std::cmp::Ordering::Greater => pos.checked_add(delta as usize).filter(|v| *v <= max),
+impl<T: Clone, const DIMS: usize> Matrix<T, DIMS> {
+    pub fn new(initial: T, dimensions: [usize; DIMS]) -> Matrix<T, DIMS> {
+        Matrix {
+            data: std::iter::repeat(initial)
+                .take(dimensions.iter().product())
+                .collect(),
+            dimensions,
+        }
     }
 }
 
-impl<T: Clone> Matrix<T> {
-    pub fn empty() -> Matrix<T> {
-        Matrix {
-            data: Vec::new(),
-            width: 0,
-            height: 0,
+impl<T, const DIMS: usize> Matrix<T, DIMS> {
+    pub fn size(&self, idx: usize) -> usize {
+        self.dimensions[idx]
+    }
+
+    pub fn in_bounds(&self, coordinates: [usize; DIMS]) -> bool {
+        for idx in (0..DIMS).rev() {
+            let coord = coordinates[idx];
+            if coord > self.dimensions[idx] {
+                return false;
+            }
         }
+        true
     }
 
-    pub fn fill(elem: T, width: usize, height: usize) -> Matrix<T> {
-        Matrix {
-            data: std::iter::repeat(elem).take(width * height).collect(),
-            width,
-            height,
-        }
-    }
-
-    pub fn add_row(&mut self, row: &[T]) {
-        if self.width == 0 {
-            self.width = row.len()
-        } else if self.width != row.len() {
-            panic!(
-                "Row size mismatch: got {} but expected {}",
-                row.len(),
-                self.width
-            )
-        }
-        self.data.extend_from_slice(row);
-        self.height += 1;
-    }
-
-    pub fn width(&self) -> usize {
-        self.width
-    }
-
-    pub fn height(&self) -> usize {
-        self.height
-    }
-
-    pub fn row(&self, idx: usize) -> &[T] {
-        &self.data[self.width * idx..self.width * (idx + 1)]
-    }
-
-    pub fn column(&self, idx: usize) -> Vec<&T> {
-        (0..self.height)
-            .map(|i| &self.data[idx + i * (self.width)])
-            .collect()
-    }
-
-    pub fn elements(&self) -> impl Iterator<Item = (usize, usize, &T)> {
-        self.data.iter().enumerate().map(|(idx, elem)| {
-            let x = idx % self.width;
-            let y = idx / self.width;
-            (x, y, elem)
-        })
-    }
-
-    pub fn elem(&self, x: usize, y: usize) -> &T {
-        let index = y * self.width + x;
-        &self.data[index]
-    }
-
-    pub fn elem_at(&self, coords: (usize, usize)) -> &T {
-        let (x, y) = coords;
-        self.elem(x, y)
-    }
-
-    pub fn elem_mut(&mut self, x: usize, y: usize) -> &mut T {
-        let index = y * self.width + x;
-        &mut self.data[index]
-    }
-
-    pub fn elem_mut_at(&mut self, coords: (usize, usize)) -> &mut T {
-        let (x, y) = coords;
-        self.elem_mut(x, y)
-    }
-
-    pub fn update(&mut self, x: usize, y: usize, value: T) {
-        *self.elem_mut(x, y) = value
-    }
-
-    pub fn update_at(&mut self, coords: (usize, usize), value: T) {
-        *self.elem_mut_at(coords) = value
-    }
-
-    pub fn neighbours(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
-        if x >= self.width || y >= self.height {
-            panic!("Out of bounds: ({x}, {y})")
-        }
-
-        let mut result = Vec::with_capacity(4);
-        if x > 0 {
-            result.push((x - 1, y));
-        }
-        if y > 0 {
-            result.push((x, y - 1));
-        }
-        if x < self.width - 1 {
-            result.push((x + 1, y));
-        }
-        if y < self.height - 1 {
-            result.push((x, y + 1));
+    fn offset(&self, coordinates: [usize; DIMS]) -> usize {
+        let mut result = 0;
+        for idx in (0..DIMS).rev() {
+            let coord = coordinates[idx];
+            if coord > self.dimensions[idx] {
+                panic!("Out of bounds: {coordinates:?}");
+            }
+            result *= self.dimensions[idx];
+            result += coord;
         }
         result
     }
 
-    pub fn step(
-        &self,
-        x: usize,
-        y: usize,
-        delta_x: isize,
-        delta_y: isize,
-    ) -> Option<(usize, usize)> {
-        let new_col = step(x, self.width - 1, delta_x)?;
-        let new_row = step(y, self.height - 1, delta_y)?;
-        Some((new_col, new_row))
+    pub fn neighbours(&self, coordinates: [usize; DIMS]) -> Vec<[usize; DIMS]> {
+        let mut result = Vec::with_capacity(DIMS * 2);
+        for (i, coord) in coordinates.into_iter().enumerate() {
+            if coord > 0 {
+                let mut n_down = coordinates;
+                n_down[i] -= 1;
+                result.push(n_down);
+            }
+            if coord < self.dimensions[i] - 1 {
+                let mut n_up = coordinates;
+                n_up[i] += 1;
+                result.push(n_up);
+            }
+        }
+        result
+    }
+
+    pub fn enumerate(&self) -> MatrixEnumerateIterator<T, DIMS> {
+        MatrixEnumerateIterator {
+            matrix: self,
+            index: 0,
+        }
     }
 }
 
-impl<T: std::fmt::Display> std::fmt::Display for Matrix<T> {
+impl<T, const DIMS: usize> std::ops::Index<[usize; DIMS]> for Matrix<T, DIMS> {
+    type Output = T;
+
+    fn index(&self, coordinates: [usize; DIMS]) -> &Self::Output {
+        &self.data[self.offset(coordinates)]
+    }
+}
+
+impl<T, const DIMS: usize> std::ops::IndexMut<[usize; DIMS]> for Matrix<T, DIMS> {
+    fn index_mut(&mut self, coordinates: [usize; DIMS]) -> &mut Self::Output {
+        let offset = self.offset(coordinates);
+        &mut self.data[offset]
+    }
+}
+
+impl<T> Matrix<T, 2> {
+    pub fn width(&self) -> usize {
+        self.size(0)
+    }
+
+    pub fn height(&self) -> usize {
+        self.size(1)
+    }
+}
+
+impl<T: Clone> Matrix<T, 2> {
+    pub fn empty() -> Matrix<T, 2> {
+        Matrix {
+            data: Vec::new(),
+            dimensions: [0, 0],
+        }
+    }
+
+    pub fn add_row(&mut self, row: &[T]) {
+        if self.dimensions[0] == 0 {
+            self.dimensions[0] = row.len()
+        } else if self.dimensions[0] != row.len() {
+            panic!(
+                "Row size mismatch: got {} but expected {}",
+                row.len(),
+                self.dimensions[0]
+            )
+        }
+        self.data.extend_from_slice(row);
+        self.dimensions[1] += 1;
+    }
+}
+
+impl<T: std::fmt::Display> std::fmt::Display for Matrix<T, 2> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for row in 0..self.height {
-            for col in 0..self.width {
-                let elem = &self.data[row * self.width + col];
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                let elem = &self[[x, y]];
                 elem.fmt(f)?;
             }
-            if row < self.height - 1 {
+            if y < self.height() - 1 {
                 writeln!(f)?
             }
         }
@@ -206,56 +193,26 @@ impl<T: std::fmt::Display> std::fmt::Display for Matrix<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct MatrixEnumerateIterator<'a, T, const DIMS: usize> {
+    matrix: &'a Matrix<T, DIMS>,
+    index: usize,
+}
 
-    #[test]
-    pub fn test_matrix() {
-        let mut matrix: Matrix<u32> = Matrix::empty();
-        matrix.add_row(&[1, 2, 3]);
-        assert_eq!(matrix.width, 3);
-        assert_eq!(matrix.height, 1);
-        assert_eq!(matrix.elem(1, 0), &2);
+impl<'a, T, const DIMS: usize> Iterator for MatrixEnumerateIterator<'a, T, DIMS> {
+    type Item = ([usize; DIMS], &'a T);
 
-        matrix.add_row(&[21, 122, 6]);
-        assert_eq!(matrix.width, 3);
-        assert_eq!(matrix.height, 2);
-        assert_eq!(matrix.elem(1, 1), &122);
-        *matrix.elem_mut(0, 0) = 5;
-        let expected_str = vec!["   5   2   3", "  21 122   6"].join("\n");
-        assert_eq!(format!("{:>4}", matrix), expected_str);
-
-        assert_eq!([21, 122, 6], matrix.row(1));
-        assert_eq!(vec![&2, &122], matrix.column(1));
-
-        let expected_elements: Vec<(usize, usize, &u32)> = vec![
-            (0, 0, &5),
-            (1, 0, &2),
-            (2, 0, &3),
-            (0, 1, &21),
-            (1, 1, &122),
-            (2, 1, &6),
-        ];
-        let elements: Vec<(usize, usize, &u32)> = matrix.elements().collect();
-        assert_eq!(elements, expected_elements);
-    }
-
-    #[test]
-    pub fn test_matrix_fill() {
-        let matrix: Matrix<char> = Matrix::fill('x', 2, 3);
-        let expected_str = vec!["xx", "xx", "xx"].join("\n");
-        assert_eq!(format!("{}", matrix), expected_str);
-    }
-
-    #[test]
-    pub fn test_matrix_neighbours() {
-        let matrix: Matrix<i32> = Matrix::fill(1, 3, 3);
-        assert_eq!(vec![(1, 0), (0, 1)], matrix.neighbours(0, 0));
-        assert_eq!(
-            vec![(0, 1), (1, 0), (2, 1), (1, 2)],
-            matrix.neighbours(1, 1)
-        );
-        assert_eq!(vec![(1, 2), (2, 1)], matrix.neighbours(2, 2));
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.matrix.dimensions.iter().product() {
+            None
+        } else {
+            let mut coordinates = [0usize; DIMS];
+            (0..DIMS).fold(self.index, |v, idx| {
+                coordinates[idx] = v % self.matrix.size(idx);
+                v / self.matrix.size(idx)
+            });
+            let result = Some((coordinates, &self.matrix.data[self.index]));
+            self.index += 1;
+            result
+        }
     }
 }

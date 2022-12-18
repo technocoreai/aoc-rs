@@ -52,7 +52,7 @@ fn probe(cycle: usize) -> bool {
 
 fn part2(input: &str) -> String {
     let mut reg_x: i64 = 1;
-    let mut result = Matrix::fill(' ', 40, 6);
+    let mut result = Matrix::new(' ', [40, 6]);
 
     for (idx, instruction) in input.lines().flat_map(MicroInstruction::parse).enumerate() {
         let column = idx % result.width();
@@ -60,12 +60,12 @@ fn part2(input: &str) -> String {
         let lit = reg_x.abs_diff(column as i64) <= 1;
 
         if lit {
-            *result.elem_mut(column, row) = '█';
+            result[[column, row]] = '█';
         }
 
         reg_x = match instruction {
             Noop => reg_x,
-            AddX(addend) => reg_x + (addend as i64),
+            AddX(addend) => reg_x + addend,
         };
     }
     format!("\n{}", result)

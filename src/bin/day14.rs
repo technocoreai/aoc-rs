@@ -1,6 +1,6 @@
 use std::cmp::{max, min};
 use std::fmt::{Display, Formatter, Write};
-use utils::{aoc_main, parse_obj, Matrix};
+use utils::{aoc_main, parse_obj, Matrix, Point2D};
 
 const SAND_START_X: usize = 500;
 
@@ -21,14 +21,14 @@ impl Display for Cell {
     }
 }
 
-fn parse_line(line: &str) -> Vec<(usize, usize)> {
+fn parse_line(line: &str) -> Vec<Point2D> {
     parse_obj("line", line, || {
         line.split(" -> ")
             .map(|point| {
                 point.split_once(',').and_then(|(x_str, y_str)| {
                     let x = x_str.parse::<usize>().ok()?;
                     let y = y_str.parse::<usize>().ok()?;
-                    Some((x, y))
+                    Some([x, y])
                 })
             })
             .collect()
@@ -37,7 +37,7 @@ fn parse_line(line: &str) -> Vec<(usize, usize)> {
 
 #[derive(Debug)]
 struct Cave {
-    cells: Matrix<Cell>,
+    cells: Matrix<Cell, 2>,
     source_x: usize,
     source_y: usize,
 }
@@ -49,10 +49,10 @@ impl Cave {
 }
 
 fn parse(input: &str, include_floor: bool) -> Cave {
-    let lines: Vec<Vec<(usize, usize)>> = input.lines().map(parse_line).collect();
+    let lines: Vec<Vec<Point2D>> = input.lines().map(parse_line).collect();
     let (input_min_x, input_max_x, input_max_y) = lines.iter().flatten().fold(
         (SAND_START_X, SAND_START_X, 0usize),
-        |(min_x, max_x, max_y), (x, y)| (min(min_x, *x), max(max_x, *x), max(max_y, *y)),
+        |(min_x, max_x, max_y), [x, y]| (min(min_x, *x), max(max_x, *x), max(max_y, *y)),
     );
 
     let mut min_x = input_min_x - 1;
@@ -65,21 +65,21 @@ fn parse(input: &str, include_floor: bool) -> Cave {
         max_x = max(max_x, SAND_START_X + max_y);
     }
 
-    let mut cells = Matrix::fill(Cell::Air, max_x - min_x + 1, max_y + 1);
+    let mut cells = Matrix::new(Cell::Air, [max_x - min_x + 1, max_y + 1]);
     for points in lines {
         for segment in points.windows(2) {
-            if let [(x1, y1), (x2, y2)] = segment {
+            if let [[x1, y1], [x2, y2]] = segment {
                 let x_start = min(x1, x2) - min_x;
                 let x_end = max(x1, x2) - min_x;
                 let y_start = *min(y1, y2);
                 let y_end = *max(y1, y2);
                 if x_start == x_end {
                     for y in y_start..=y_end {
-                        cells.update(x_start, y, Cell::Rock);
+                        cells[[x_start, y]] = Cell::Rock;
                     }
                 } else {
                     for x in x_start..=x_end {
-                        cells.update(x, y_start, Cell::Rock);
+                        cells[[x, y_start]] = Cell::Rock;
                     }
                 }
             }
@@ -88,7 +88,7 @@ fn parse(input: &str, include_floor: bool) -> Cave {
 
     if include_floor {
         for x in 0..cells.width() {
-            cells.update(x, max_y, Cell::Rock);
+            cells[[x, max_y]] = Cell::Rock;
         }
     }
 
@@ -99,21 +99,21 @@ fn parse(input: &str, include_floor: bool) -> Cave {
     }
 }
 
-fn advance_sand(cave: &Cave, x: usize, y: usize) -> Option<(usize, usize)> {
-    [(x, y + 1), (x - 1, y + 1), (x + 1, y + 1)]
+fn advance_sand(cave: &Cave, x: usize, y: usize) -> Option<Point2D> {
+    [[x, y + 1], [x - 1, y + 1], [x + 1, y + 1]]
         .into_iter()
-        .find(|(x, y)| cave.in_bounds(*x, *y) && *cave.cells.elem(*x, *y) == Cell::Air)
+        .find(|[x, y]| cave.in_bounds(*x, *y) && cave.cells[[*x, *y]] == Cell::Air)
 }
 
 fn drop_sand(cave: &mut Cave) -> bool {
     let (mut current_x, mut current_y) = (cave.source_x, cave.source_y);
-    while let Some((x, y)) = advance_sand(cave, current_x, current_y) {
+    while let Some([x, y]) = advance_sand(cave, current_x, current_y) {
         if x == 0 || y == cave.cells.width() - 1 {
             return false;
         }
         (current_x, current_y) = (x, y)
     }
-    cave.cells.update(current_x, current_y, Cell::Sand);
+    cave.cells[[current_x, current_y]] = Cell::Sand;
     true
 }
 
@@ -131,7 +131,7 @@ fn part1(input: &str) -> u32 {
 fn part2(input: &str) -> u32 {
     let mut cave = parse(input, true);
     let mut result = 0;
-    while *cave.cells.elem(cave.source_x, cave.source_y) == Cell::Air {
+    while cave.cells[[cave.source_x, cave.source_y]] == Cell::Air {
         drop_sand(&mut cave);
         result += 1;
         if cave.cells.width() < 50 {
