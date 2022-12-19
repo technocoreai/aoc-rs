@@ -1,5 +1,6 @@
 use enum_map::{enum_map, Enum, EnumMap};
 use rayon::prelude::*;
+use std::collections::BTreeMap;
 use utils::{aoc_main, parse_peg};
 
 peg::parser! {
@@ -86,6 +87,7 @@ fn stockpile_duration(
 }
 
 fn simulate(
+    max_geode_robots: &mut BTreeMap<u64, u64>,
     blueprint: &Blueprint,
     max_turns: u64,
     current_turn: u64,
@@ -101,6 +103,13 @@ fn simulate(
             " ", blueprint.id,
         );
     }
+
+    if let Some(better_score) = max_geode_robots.get(&current_turn) {
+        if *better_score > current_robots[Resource::Geode] {
+            return (0, 0);
+        }
+    }
+    max_geode_robots.insert(current_turn, current_robots[Resource::Geode]);
 
     let mut result =
         current_resources[Resource::Geode] + current_robots[Resource::Geode] * remaining_turns;
@@ -127,6 +136,7 @@ fn simulate(
                 }
 
                 let (build_result, build_states) = simulate(
+                    max_geode_robots,
                     blueprint,
                     max_turns,
                     current_turn + step_time,
@@ -143,6 +153,7 @@ fn simulate(
 
 fn max_geode_count(blueprint: &Blueprint, max_turns: u64) -> u64 {
     let (geode_count, states) = simulate(
+        &mut BTreeMap::new(),
         blueprint,
         max_turns,
         0,
@@ -189,6 +200,6 @@ Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsid
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(EXAMPLE_INPUT), 62);
+        assert_eq!(part2(EXAMPLE_INPUT), 56 * 62);
     }
 }
