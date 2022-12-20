@@ -1,6 +1,5 @@
 use enum_map::{enum_map, Enum, EnumMap};
 use rayon::prelude::*;
-use std::collections::BTreeMap;
 use utils::{aoc_main, parse_peg};
 
 peg::parser! {
@@ -25,10 +24,7 @@ peg::parser! {
 
         rule blueprint() -> Blueprint
             = "Blueprint " id:integer() ": " robot_costs:(robot_costs() ** " ") {
-            Blueprint {
-                id,
-                robot_costs: robot_costs.into_iter().collect()
-            }
+            Blueprint::new(id, robot_costs.into_iter().collect())
         }
 
         pub rule input() -> Vec<Blueprint> =
@@ -49,7 +45,26 @@ type ResourceAmounts = EnumMap<Resource, u64>;
 #[derive(Debug)]
 pub struct Blueprint {
     id: u64,
+    max_costs: EnumMap<Resource, u64>,
     robot_costs: EnumMap<Resource, ResourceAmounts>,
+}
+
+impl Blueprint {
+    fn new(id: u64, robot_costs: EnumMap<Resource, ResourceAmounts>) -> Blueprint {
+        let mut max_costs = enum_map! {_ => 0};
+
+        for costs in robot_costs.values() {
+            for (resource, cost) in costs {
+                max_costs[resource] = max_costs[resource].max(*cost)
+            }
+        }
+
+        Blueprint {
+            id,
+            max_costs,
+            robot_costs,
+        }
+    }
 }
 
 fn stockpile_duration_single(current_amount: u64, robots: u64, cost: u64) -> Option<u64> {
@@ -87,7 +102,6 @@ fn stockpile_duration(
 }
 
 fn simulate(
-    max_geode_robots: &mut BTreeMap<u64, u64>,
     blueprint: &Blueprint,
     max_turns: u64,
     current_turn: u64,
@@ -104,19 +118,18 @@ fn simulate(
         );
     }
 
-    if let Some(better_score) = max_geode_robots.get(&current_turn) {
-        if *better_score > current_robots[Resource::Geode] {
-            return (0, 0);
-        }
-    }
-    max_geode_robots.insert(current_turn, current_robots[Resource::Geode]);
-
     let mut result =
         current_resources[Resource::Geode] + current_robots[Resource::Geode] * remaining_turns;
     let mut states = 1;
 
     if current_turn < max_turns {
         for (resource, costs) in &blueprint.robot_costs {
+            if resource != Resource::Geode
+                && current_robots[resource] >= blueprint.max_costs[resource]
+            {
+                continue;
+            }
+
             if let Some(stockpile_turns) =
                 stockpile_duration(&current_resources, &current_robots, costs)
             {
@@ -136,7 +149,6 @@ fn simulate(
                 }
 
                 let (build_result, build_states) = simulate(
-                    max_geode_robots,
                     blueprint,
                     max_turns,
                     current_turn + step_time,
@@ -153,7 +165,6 @@ fn simulate(
 
 fn max_geode_count(blueprint: &Blueprint, max_turns: u64) -> u64 {
     let (geode_count, states) = simulate(
-        &mut BTreeMap::new(),
         blueprint,
         max_turns,
         0,
