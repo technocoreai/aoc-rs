@@ -32,12 +32,16 @@ fn mix(input: Vec<isize>, iterations: usize) -> Vec<isize> {
     result.into_iter().map(|(_, elem)| elem).collect()
 }
 
-fn result(mixed: Vec<isize>) -> isize {
+fn solve(input: &str, key: isize, iterations: usize) -> isize {
+    let input = parse_input(input).iter().map(|v| v * key).collect();
+    let mixed = mix(input, iterations);
+
     let (zero_idx, _) = mixed
         .iter()
         .enumerate()
         .find(|(_, elem)| **elem == 0)
         .unwrap();
+
     [1000, 2000, 3000]
         .iter()
         .map(|i| mixed[(zero_idx + i) % mixed.len()])
@@ -45,13 +49,11 @@ fn result(mixed: Vec<isize>) -> isize {
 }
 
 fn part1(input: &str) -> isize {
-    let input = parse_input(input);
-    result(mix(input, 1))
+    solve(input, 1, 1)
 }
 
 fn part2(input: &str) -> isize {
-    let input = parse_input(input).iter().map(|v| v * 811589153).collect();
-    result(mix(input, 10))
+    solve(input, 811589153, 10)
 }
 
 fn main() {
