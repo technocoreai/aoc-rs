@@ -325,7 +325,7 @@ fn part1(input: &str) -> usize {
 }
 
 fn part2(input: &str) -> usize {
-    let fill_transitions: for<'a> fn(&'a mut Map) = |map| {
+    solve(input, 50, |map| {
         map.regions[0].transitions = enum_map! {
             Down => Warp(2),
             Right => Warp(1),
@@ -362,8 +362,7 @@ fn part2(input: &str) -> usize {
             Left => CCW(0),
             Right => CCW(4),
         };
-    };
-    solve(input, 50, fill_transitions)
+    })
 }
 
 fn main() {
@@ -396,15 +395,17 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        let fill_transitions: for<'a> fn(&'a mut Map) = |map| {
-            // I'm not doing the whole cube
-            map.regions[0].transitions[Down] = Warp(3);
-            map.regions[3].transitions[Right] = CW(5);
-            map.regions[5].transitions[Left] = Warp(4);
-            map.regions[4].transitions[Down] = WarpFlip(1);
-            map.regions[1].transitions[Right] = Warp(2);
-            map.regions[2].transitions[Up] = CW(0);
-        };
-        assert_eq!(solve(EXAMPLE_INPUT, 4, fill_transitions), 5031);
+        assert_eq!(
+            solve(EXAMPLE_INPUT, 4, |map| {
+                // I'm not doing the whole cube
+                map.regions[0].transitions[Down] = Warp(3);
+                map.regions[3].transitions[Right] = CW(5);
+                map.regions[5].transitions[Left] = Warp(4);
+                map.regions[4].transitions[Down] = WarpFlip(1);
+                map.regions[1].transitions[Right] = Warp(2);
+                map.regions[2].transitions[Up] = CW(0);
+            }),
+            5031
+        );
     }
 }
