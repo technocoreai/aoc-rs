@@ -120,16 +120,22 @@ impl Map {
     }
 
     fn neighbours(&self, (x, y): Point2D) -> [bool; 8] {
-        [
-            self.get((x - 1, y - 1)),
-            self.get((x, y - 1)),
-            self.get((x + 1, y - 1)),
-            self.get((x - 1, y)),
-            self.get((x + 1, y)),
-            self.get((x - 1, y + 1)),
-            self.get((x, y + 1)),
-            self.get((x + 1, y + 1)),
-        ]
+        let mut result = [false; 8];
+        if let Some(prev_row) = self.data.get(&(y - 1)) {
+            result[0] = prev_row.contains(&(x - 1));
+            result[1] = prev_row.contains(&x);
+            result[2] = prev_row.contains(&(x + 1));
+        }
+        if let Some(this_row) = self.data.get(&y) {
+            result[3] = this_row.contains(&(x - 1));
+            result[4] = this_row.contains(&(x + 1));
+        }
+        if let Some(next_row) = self.data.get(&(y + 1)) {
+            result[5] = next_row.contains(&(x - 1));
+            result[6] = next_row.contains(&x);
+            result[7] = next_row.contains(&(x + 1));
+        }
+        result
     }
 
     fn len(&self) -> usize {
