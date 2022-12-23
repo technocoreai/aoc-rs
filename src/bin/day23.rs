@@ -92,6 +92,27 @@ impl Map {
             .or_insert_with(|| std::iter::once(x).collect());
     }
 
+    fn update(&mut self, (src_x, src_y): Point2D, (dst_x, dst_y): Point2D) {
+        let src_row = self
+            .data
+            .get_mut(&src_y)
+            .unwrap_or_else(|| panic!("No element at {src_x}:{src_y}"));
+
+        if !src_row.contains(&src_x) {
+            panic!("No element at {src_x}:{src_y}");
+        }
+
+        src_row.remove(&src_x);
+        if src_y == dst_y {
+            src_row.insert(dst_x);
+        } else {
+            if src_row.is_empty() {
+                self.data.remove(&src_y);
+            }
+            self.set((dst_x, dst_y));
+        }
+    }
+
     fn items(&self) -> impl Iterator<Item = Point2D> + '_ {
         self.data
             .iter()
@@ -146,46 +167,56 @@ fn parse(input: &str) -> Map {
     result
 }
 
-fn move_destination(point: Point2D, neighbours: &[bool; 8], directions: &[Direction]) -> Point2D {
+fn move_destination(
+    point: Point2D,
+    neighbours: &[bool; 8],
+    directions: &[Direction],
+) -> Option<Point2D> {
     for direction in directions {
         let can_move = direction
             .checked_neighbours()
             .into_iter()
             .all(|idx| !neighbours[idx]);
         if can_move {
-            return direction.move_destination(point);
+            return Some(direction.move_destination(point));
         }
     }
-    point
+    None
 }
 
-fn update(map: &Map, directions: &[Direction]) -> Map {
+fn update(map: &mut Map, directions: &[Direction]) -> bool {
     let mut moves = BTreeMap::new();
     let mut move_destinations = BTreeMap::new();
 
     for elf in map.items() {
         let neighbours = map.neighbours(elf);
-        let destination = if !neighbours.contains(&true) {
-            elf
+        let maybe_destination = if !neighbours.contains(&true) {
+            None
         } else {
             move_destination(elf, &neighbours, directions)
         };
 
-        moves.insert(elf, destination);
-        move_destinations
-            .entry(destination)
-            .and_modify(|v| *v += 1)
-            .or_insert(1);
-    }
+        moves.insert(elf, maybe_destination);
 
-    let mut result = Map::new();
-    for (src, dest) in moves {
-        match move_destinations.get(&dest) {
-            Some(v) if *v == 1 => result.set(dest),
-            _ => result.set(src),
+        if let Some(destination) = maybe_destination {
+            move_destinations
+                .entry(destination)
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
         }
     }
-    result
+
+    let mut moved = false;
+    for (src, maybe_destination) in moves {
+        let move_destination = maybe_destination
+            .filter(|destination| matches!(move_destinations.get(destination), Some(v) if *v == 1));
+
+        if let Some(destination) = move_destination {
+            map.update(src, destination);
+            moved = true;
+        }
+    }
+    moved
 }
 
 fn part1(input: &str) -> usize {
@@ -197,19 +228,33 @@ fn part1(input: &str) -> usize {
         Direction::East,
     ];
     for _ in 0..10 {
-        map = update(&map, &directions);
+        update(&mut map, &directions);
         directions.rotate_left(1);
     }
 
     map.area() - map.len()
 }
 
-fn part2(input: &str) -> u32 {
-    unimplemented!();
+fn part2(input: &str) -> usize {
+    let mut map = parse(input);
+    let mut directions = vec![
+        Direction::North,
+        Direction::South,
+        Direction::West,
+        Direction::East,
+    ];
+    for i in 0.. {
+        let moved = update(&mut map, &directions);
+        if !moved {
+            return i + 1;
+        }
+        directions.rotate_left(1);
+    }
+    panic!("No solution");
 }
 
 fn main() {
-    aoc_main!(part1);
+    aoc_main!(part1, part2);
 }
 
 #[cfg(test)]
@@ -229,8 +274,8 @@ mod tests {
         assert_eq!(part1(EXAMPLE_INPUT), 110);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 20);
+    }
 }
