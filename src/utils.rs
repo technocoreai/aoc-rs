@@ -60,10 +60,29 @@ pub fn parse_peg<T>(
 pub type Point2D = [usize; 2];
 pub type Point3D = [usize; 3];
 
+pub fn manhattan_distance<const N: usize>(a: &[usize; N], b: &[usize; N]) -> usize {
+    let mut result = 0;
+    for i in 0..N {
+        result += a[i].abs_diff(b[i])
+    }
+    result
+}
+
 #[derive(Debug)]
 pub struct Matrix<T, const DIMS: usize> {
     data: Vec<T>,
     dimensions: [usize; DIMS],
+}
+
+impl Matrix<char, 2> {
+    pub fn read(input: &str) -> Matrix<char, 2> {
+        let mut result = Matrix::empty();
+        for line in input.lines() {
+            let chars: Vec<_> = line.chars().collect();
+            result.add_row(&chars);
+        }
+        result
+    }
 }
 
 impl<T: Clone, const DIMS: usize> Matrix<T, DIMS> {
@@ -152,6 +171,20 @@ impl<T> Matrix<T, 2> {
 
     pub fn height(&self) -> usize {
         self.size(1)
+    }
+}
+
+impl<T> Matrix<T, 3> {
+    pub fn width(&self) -> usize {
+        self.size(0)
+    }
+
+    pub fn height(&self) -> usize {
+        self.size(1)
+    }
+
+    pub fn depth(&self) -> usize {
+        self.size(2)
     }
 }
 
