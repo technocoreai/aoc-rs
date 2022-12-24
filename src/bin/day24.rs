@@ -91,6 +91,8 @@ fn solve(
     let mut pending = Vec::with_capacity(1000000);
     let mut best_cell_score = Matrix::new(usize::MAX, [map.width(), map.height(), map.period()]);
 
+    let going_down = target_position[1] > initial_position[1];
+
     pending.push((initial_turn, initial_position));
     while let Some((turn, current_position)) = pending.pop() {
         if turn >= best_score {
@@ -117,15 +119,26 @@ fn solve(
         }
 
         let [x, y] = current_position;
-        pending.push((turn + 1, [x - 1, y]));
-        pending.push((turn + 1, [x + 1, y]));
-        if y > 0 {
-            pending.push((turn + 1, [x, y - 1]));
-        }
-        if y < map.height() - 1 {
-            pending.push((turn + 1, [x, y + 1]));
-        }
         pending.push((turn + 1, current_position));
+        if going_down {
+            if y > 0 {
+                pending.push((turn + 1, [x, y - 1]));
+            }
+            pending.push((turn + 1, [x - 1, y]));
+            pending.push((turn + 1, [x + 1, y]));
+            if y < map.height() - 1 {
+                pending.push((turn + 1, [x, y + 1]));
+            }
+        } else {
+            pending.push((turn + 1, [x + 1, y]));
+            if y < map.height() - 1 {
+                pending.push((turn + 1, [x, y + 1]));
+            }
+            if y > 0 {
+                pending.push((turn + 1, [x, y - 1]));
+            }
+            pending.push((turn + 1, [x - 1, y]));
+        }
     }
     best_score
 }
