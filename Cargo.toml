@@ -8,7 +8,7 @@ name = "utils"
 path = "src/utils.rs"
 
 [dependencies]
-peg = "0.8.1"
+peg = "0.8.2"
 enum-map = "2.4.1"
 rayon = "1.6.0"
 num-integer = "0.1.45"
