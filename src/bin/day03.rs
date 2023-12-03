@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Range;
 use utils::{aoc_main, Matrix};
 
@@ -67,41 +68,55 @@ fn neighbour_range(map: &Matrix<char, 2>, range: Range<usize>) -> Range<usize> {
     start..end
 }
 
-fn adjacent_to_symbol(map: &Matrix<char, 2>, num: &Number) -> bool {
-    if num.columns.start > 0 && is_symbol(map[[num.columns.start - 1, num.row]]) {
-        return true;
+fn neighbours(map: &Matrix<char, 2>, num: &Number) -> Vec<[usize; 2]> {
+    let mut result = Vec::new();
+    if num.columns.start > 0 {
+        result.push([num.columns.start - 1, num.row]);
     }
-    if num.columns.end < map.width() - 2 && is_symbol(map[[num.columns.end, num.row]]) {
-        return true;
+    if num.columns.end < map.width() - 2 {
+        result.push([num.columns.end, num.row]);
     }
-    if num.row > 0
-        && neighbour_range(map, num.columns.clone()).any(|col| is_symbol(map[[col, num.row - 1]]))
-    {
-        return true;
+    if num.row > 0 {
+        result.extend(neighbour_range(map, num.columns.clone()).map(|col| [col, num.row - 1]));
     }
-    if num.row < map.height() - 2
-        && neighbour_range(map, num.columns.clone()).any(|col| is_symbol(map[[col, num.row + 1]]))
-    {
-        return true;
+    if num.row < map.height() - 2 {
+        result.extend(neighbour_range(map, num.columns.clone()).map(|col| [col, num.row + 1]));
     }
-    false
+    result
 }
 
 fn part1(input: &str) -> u32 {
     let map = Matrix::read(input);
     find_numbers(&map)
         .into_iter()
-        .filter(|num| adjacent_to_symbol(&map, num))
+        .filter(|num| neighbours(&map, num).iter().any(|c| is_symbol(map[*c])))
         .map(|num| num.value)
         .sum()
 }
 
 fn part2(input: &str) -> u32 {
-    unimplemented!();
+    let map = Matrix::read(input);
+    let mut gears: HashMap<[usize; 2], Vec<u32>> = HashMap::new();
+
+    for num in find_numbers(&map) {
+        for neighbour in neighbours(&map, &num) {
+            if map[neighbour] == '*' {
+                gears
+                    .entry(neighbour)
+                    .and_modify(|v| v.push(num.value))
+                    .or_insert(vec![num.value]);
+            }
+        }
+    }
+    gears
+        .values()
+        .map(|v| if v.len() == 2 { v.iter().product() } else { 0 })
+        .sum()
 }
 
 fn main() {
     aoc_main!(part1);
+    aoc_main!(part2);
 }
 
 #[cfg(test)]
@@ -124,8 +139,8 @@ mod tests {
         assert_eq!(part1(EXAMPLE_INPUT), 4361);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 467835);
+    }
 }
