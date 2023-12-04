@@ -1,19 +1,20 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use utils::{aoc_main, parse_peg};
 
 peg::parser! {
   grammar input_parser() for str {
-    rule number() -> u32
-      = n:$(['0'..='9']+) {? n.parse().or(Err("u32")) }
+    rule number() -> usize
+      = n:$(['0'..='9']+) {? n.parse().or(Err("usize")) }
 
     rule ws() = " "+
 
-    rule numbers() -> Vec<u32>
+    rule numbers() -> Vec<usize>
       = n:number() ++ ws()
 
     rule card() -> Card
-      = "Card" ws() number() ":" ws() wins:numbers() ws() "|" ws() player:numbers() {
+      = "Card" ws() id:number() ":" ws() wins:numbers() ws() "|" ws() player:numbers() {
             Card {
+                id,
                 winning_numbers: wins.into_iter().collect(),
                 player_numbers: player.into_iter().collect(),
             }
@@ -26,8 +27,17 @@ peg::parser! {
 
 #[derive(Debug)]
 pub struct Card {
-    winning_numbers: HashSet<u32>,
-    player_numbers: HashSet<u32>,
+    id: usize,
+    winning_numbers: HashSet<usize>,
+    player_numbers: HashSet<usize>,
+}
+
+impl Card {
+    pub fn win_count(&self) -> usize {
+        self.player_numbers
+            .intersection(&self.winning_numbers)
+            .count()
+    }
 }
 
 fn part1(input: &str) -> usize {
@@ -35,10 +45,7 @@ fn part1(input: &str) -> usize {
     cards
         .iter()
         .map(|card| {
-            let win_count = card
-                .player_numbers
-                .intersection(&card.winning_numbers)
-                .count();
+            let win_count = card.win_count();
             if win_count > 0 {
                 2usize.pow(u32::try_from(win_count).unwrap() - 1)
             } else {
@@ -48,12 +55,27 @@ fn part1(input: &str) -> usize {
         .sum()
 }
 
-fn part2(input: &str) -> u32 {
-    unimplemented!();
+fn part2(input: &str) -> usize {
+    let cards = parse_peg(input, input_parser::input);
+    let mut result = 0usize;
+    let mut copy_counts: HashMap<usize, usize> = HashMap::new();
+    for card in cards {
+        let adjusted_count = 1 + copy_counts.remove(&card.id).unwrap_or(0);
+        result += adjusted_count;
+
+        for i in 1..=card.win_count() {
+            copy_counts
+                .entry(card.id + i)
+                .and_modify(|v| *v += adjusted_count)
+                .or_insert(adjusted_count);
+        }
+    }
+    result
 }
 
 fn main() {
     aoc_main!(part1);
+    aoc_main!(part2);
 }
 
 #[cfg(test)]
@@ -72,8 +94,8 @@ Card 6: 31 18 13 56 72 | 74 77 10 23 35 67 36 11";
         assert_eq!(part1(EXAMPLE_INPUT), 13);
     }
 
-    //#[test]
-    //fn test_part2() {
-    //    assert_eq!(part2(EXAMPLE_INPUT), 0);
-    //}
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(EXAMPLE_INPUT), 30);
+    }
 }
